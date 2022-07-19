@@ -6,10 +6,7 @@ import matplotlib.pyplot as plt
 
 import loader
 import models
-
-
-def clonumpy(tensor):
-    return tensor.clone().detach().numpy().flatten()
+from utils import clonumpy
 
 
 def one_call(data, model, criterion, compute_correlation=True):
@@ -29,9 +26,15 @@ def one_call(data, model, criterion, compute_correlation=True):
 
 if __name__ == '__main__':
     pass
-    data_train = loader.load_all()
-    data_test = loader.load_all(train=False)
-    model = models.Corrector()
+    torch.random.manual_seed(42)
+    META = False
+    CORRECT_MODE = True
+    IN_CHANNELS = 2
+    MID_CHANNELS = 16
+    data_train = loader.load_all(meta=META)
+    data_test = loader.load_all(train=False, meta=META)
+    # model = models.Corrector(mid_channel=MID_CHANNELS, in_channels=IN_CHANNELS, correct_mode=CORRECT_MODE)
+    model = models.DoubleCorrector(mid_channel=MID_CHANNELS)
     criterion = torch.nn.MSELoss()
 
     # from cProfile import Profile
@@ -56,7 +59,7 @@ if __name__ == '__main__':
     print(f"Testing baseline loss : {baseline_test_loss.item()} and correlation {baseline_test_correlation}")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    epochs = 100
+    epochs = 200
     all_corrs_train = list()
     all_corrs_test = list()
     for i, epoch in enumerate(range(epochs)):
@@ -77,5 +80,6 @@ if __name__ == '__main__':
     plt.ylim(bottom=0)
     plt.legend()
     plt.show()
-
-    torch.save(model, 'md_corrector.pt')
+    # name = f"{'meta' if META else 'md'}_{IN_CHANNELS}_{'correct' if CORRECT_MODE else 'direct'}_corrector.pt"
+    name = "double_corrector.pt"
+    torch.save(model, name)
