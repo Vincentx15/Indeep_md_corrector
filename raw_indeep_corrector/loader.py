@@ -4,7 +4,7 @@ import torch
 
 
 def load_all(train=True, meta=False):
-    wdir = os.path.join('train_indeep', 'Training' if train else 'Test')
+    wdir = os.path.join('raw_indeep_corrector/train_indeep', 'Training' if train else 'Test')
     csv_files = []
     for file in os.listdir(wdir):
         if meta and 'Meta' in file:
