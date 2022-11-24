@@ -5,6 +5,9 @@ from scipy import ndimage
 from sklearn.gaussian_process.kernels import RBF
 from scipy.spatial.transform import Rotation as R
 
+from torch.utils.data.dataset import Dataset
+from torch.utils.data import DataLoader
+import pandas as pd
 import sys
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -170,7 +173,7 @@ def get_grid(coords, features=None, spacing=2., padding=3, xyz_min=None, xyz_max
     return grid
 
 
-def get_mask_grid(grid, gaussian_cutoff=0.2, iterations=6):
+def get_enveloppe_grid(grid, gaussian_cutoff=0.2, iterations=6):
     """
     Returns a grid with a binary value corresponding to ones in the enveloppe of the input protein.
     :param grid:
@@ -187,7 +190,7 @@ def get_mask_grid(grid, gaussian_cutoff=0.2, iterations=6):
 
 
 class Complex(object):
-    def __init__(self, points, name, center, size=20, spacing=1., rotate=True):
+    def __init__(self, points, center, name=None, size=20, spacing=1., rotate=True, compute_enveloppe=False):
         """
         - protein: a string identifying the protein
         - rotate: if True, randomly rotate the coordinates of the complex
@@ -198,8 +201,10 @@ class Complex(object):
         self.ids, coords = np.int32(points[:, -1]), points[:, :3]
         self.coords = self.random_rotate(coords) if rotate else coords
         self.xyz_min, self.xyz_max = np.asarray(center) - size // 2, np.asarray(center) + size // 2
+
         self.grid = self.compute_grid()
-        self.mask = self.compute_mask_grid()
+        if compute_enveloppe:
+            self.enveloppe = self.compute_enveloppe_grid()
 
     @staticmethod
     def random_rotate(coords, center=None):
@@ -208,11 +213,11 @@ class Complex(object):
         """
         alpha, beta, gamma = np.random.uniform(low=0., high=360., size=3)
         r = R.from_euler('zyx', [alpha, beta, gamma], degrees=True)
-        print(coords[:3])
+        # print(coords[:3])
         com = coords.mean(axis=0) if center is None else center
         coords_0 = coords - com
         rotated_shifted = r.apply(coords_0) + com
-        print(rotated_shifted[:3])
+        # print(rotated_shifted[:3])
         return rotated_shifted
 
     def compute_grid(self):
@@ -227,20 +232,21 @@ class Complex(object):
                         padding=0,
                         xyz_min=self.xyz_min,
                         xyz_max=self.xyz_max)
-        return grid
+        return grid.astype(np.float32)
 
-    def compute_mask_grid(self):
+    def compute_enveloppe_grid(self):
         """
         Return the grid (with channels) for the protein
         with the corresponding channel ids (x, y, z, channel_id)
         """
-        return get_mask_grid(self.grid)
+        return get_enveloppe_grid(self.grid)
 
     def save_mrc_prot(self):
         """
         Save all the channels of the protein in separate mrc files
         """
-        outbasename = os.path.splitext(self.name)[0]
+        name = self.name if self.name is not None else 'protein'
+        outbasename = os.path.splitext(name)[0]
         for channel_id, atomtype in enumerate(utils.ATOMTYPES):
             utils.save_density(self.grid[channel_id, ...],
                                '%s_%s.mrc' % (outbasename, atomtype),
@@ -250,10 +256,45 @@ class Complex(object):
                            self.spacing, self.xyz_min, padding=0)
 
 
+class RMSDDataset(Dataset):
+
+    def __init__(self, csv_file="../data/toy.csv", rotate=True):
+        self.df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
+        # self.df = pd.read_csv(csv_file)
+        self.rotate = rotate
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, item):
+        row = self.df.iloc[item, :]
+        pdb, sel, rmsd = row
+        pdb_filename = os.path.join('../data', pdb)
+        selection_filename = os.path.join('../data', sel)
+        with open(selection_filename, 'r') as f:
+            sel = f.readline()
+
+        # Based on that get coords
+        coords = build_coord_channel(pdbfilename_p=pdb_filename, selection=sel)
+
+        # Use to define center and size, and then a complex
+        center = coords.mean(axis=0)[:3]
+        center = tuple(center)
+        # print(coords.max(axis=0) - coords.min(axis=0))
+        size = 20
+        comp = Complex(points=coords, center=center, size=size)
+        return comp.grid, np.asarray(rmsd).astype(np.float32)
+
+
 if __name__ == '__main__':
     pass
-    pdbfilename_p = 'data/BCL2/pdbs/1gjh.pdb'
-    coords = build_coord_channel(pdbfilename_p)
-    comp = Complex(points=coords, name='1gjh', center=(3.4, -4.2, 16))
+    # pdbfilename_p = '../data/BCL2/pdbs/1gjh.pdb'
+    # coords = build_coord_channel(pdbfilename_p)
+    # comp = Complex(points=coords, name='1gjh', center=(3.4, -4.2, 16))
     # comp.save_mrc_prot()
     # print(comp.grid.shape)
+
+    dataset = RMSDDataset()
+    loader = DataLoader(dataset=dataset, num_workers=2, batch_size=2)
+    for i, (grids, rmsds) in enumerate(loader):
+        print(grids.shape)
