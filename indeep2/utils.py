@@ -10,6 +10,15 @@ from pymol import cmd
 import mrcfile
 
 
+def correct_df(in_csv):
+    with open(in_csv, 'r') as f:
+        lines = f.readlines()
+        updated_lines = [line.replace('PL_train', 'PL_validation') for line in lines]
+        # updated_lines = [line.replace('PL_train', 'PL_test') for line in lines]
+    with open(in_csv, 'w') as f:
+        f.writelines(updated_lines)
+
+
 def read_atomtypes():
     """
     Read the atomtype_mapping.txt file and return the
