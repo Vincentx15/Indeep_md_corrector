@@ -13,7 +13,7 @@ import pandas as pd
 import sys
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(script_dir, '..'))
+sys.path.append(os.path.join(script_dir, ''))
 
 import utils
 
@@ -278,7 +278,7 @@ class RMSDDataset(Dataset):
     def __getitem__(self, item):
         row = self.df.iloc[item, :]
         pdb, sel, rmsd = row
-        pdb_filename = os.path.join('../data', pdb)
+        pdb_filename = os.path.join('data', pdb)
         use_pl = self.get_pl_instead > random.random()
         if use_pl:
             pl_dir, decoy_file = os.path.split(pdb_filename)
@@ -286,7 +286,7 @@ class RMSDDataset(Dataset):
             pdb_filename = os.path.join(pl_dir, pl_file)
             rmsd = 0
 
-        selection_filename = os.path.join('../data', sel)
+        selection_filename = os.path.join('data', sel)
         with open(selection_filename, 'r') as f:
             sel = f.readline()
 

@@ -4,7 +4,7 @@ import time
 import scipy
 
 import torch
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import DataLoader
 
 import pymol
 import pymol2
@@ -13,10 +13,10 @@ pymol.invocation.parse_args(['pymol', '-q'])  # optional, for quiet flag
 pymol2.SingletonPyMOL().start()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(script_dir, '..'))
+sys.path.append(os.path.join(script_dir, ''))
 
-from indeep2.loader import RMSDDataset
-from indeep2.model import RMSDModel
+from loader import RMSDDataset
+from model import RMSDModel
 
 
 def train(model, device, optimizer, mse_fn, loader):
@@ -77,13 +77,13 @@ if __name__ == '__main__':
 
     spacing = 1
 
-    train_dataset = RMSDDataset("../data/data/df_rmsd_train.csv", spacing=spacing)
-    val_dataset = RMSDDataset("../data/data/df_rmsd_validation.csv", spacing=spacing)
+    train_dataset = RMSDDataset("data/data/df_rmsd_train.csv", spacing=spacing)
+    val_dataset = RMSDDataset("data/data/df_rmsd_validation.csv", spacing=spacing)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1, batch_size=30)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
 
     train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
     torch.save(model.state_dict(), 'first_model.pth')
-    ground_truth, predicition = validate(model=model, device=device, mse_fn=mse_fn, loader=val_loader)
-    correlation = scipy.stats.linregress(ground_truth, predicition)
+    ground_truth, prediction = validate(model=model, device=device, mse_fn=mse_fn, loader=val_loader)
+    correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)
