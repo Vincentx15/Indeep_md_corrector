@@ -52,7 +52,8 @@ class RMSDModel(nn.Module):
         # augment channels, reduce size
         for block in self.convs:
             x = block(x)
-        assert all([1 == i for i in x.shape[-3:]])
+        if not all([1 == i for i in x.shape[-3:]]):
+            x = nn.AvgPool3d(kernel_size=x.shape[-3])(x)
 
         # Then reshape to get just the embedding and go through FC
         x = torch.reshape(x, x.shape[:2])

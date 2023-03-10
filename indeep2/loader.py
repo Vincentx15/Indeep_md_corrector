@@ -1,4 +1,6 @@
 import os
+import random
+
 import pymol.cmd as cmd
 import numpy as np
 from scipy import ndimage
@@ -42,11 +44,11 @@ def build_coord_channel(pdbfilename_p, selection=None):
         if coords is not None:
             if coords_all is None:
                 coords_all = np.c_[coords,
-                                   np.repeat(cid, coords.shape[0])]
+                np.repeat(cid, coords.shape[0])]
             else:
                 coords_all = np.r_[coords_all,
-                                   np.c_[coords,
-                                         np.repeat(cid, coords.shape[0])]]
+                np.c_[coords,
+                np.repeat(cid, coords.shape[0])]]
     coords_all = np.stack(coords_all)
     return coords_all
 
@@ -200,7 +202,7 @@ class Complex(object):
         self.spacing = spacing
         self.ids, coords = np.int32(points[:, -1]), points[:, :3]
         self.coords = self.random_rotate(coords) if rotate else coords
-        self.xyz_min, self.xyz_max = np.asarray(center) - size // 2, np.asarray(center) + size // 2
+        self.xyz_min, self.xyz_max = np.asarray(center) - size // 2, np.asarray(center) + size // 2 + 0.0001
 
         self.grid = self.compute_grid()
         if compute_enveloppe:
@@ -258,10 +260,17 @@ class Complex(object):
 
 class RMSDDataset(Dataset):
 
-    def __init__(self, csv_file="../data/toy.csv", rotate=True):
+    def __init__(self, csv_file="../data/data/df_rmsd_train.csv",
+                 rotate=True,
+                 get_pl_instead=0.5,
+                 size=20,
+                 spacing=1.0):
         self.df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
         # self.df = pd.read_csv(csv_file)
         self.rotate = rotate
+        self.get_pl_instead = get_pl_instead
+        self.size = size
+        self.spacing = spacing
 
     def __len__(self):
         return len(self.df)
@@ -270,6 +279,13 @@ class RMSDDataset(Dataset):
         row = self.df.iloc[item, :]
         pdb, sel, rmsd = row
         pdb_filename = os.path.join('../data', pdb)
+        use_pl = self.get_pl_instead > random.random()
+        if use_pl:
+            pl_dir, decoy_file = os.path.split(pdb_filename)
+            pl_file = decoy_file.split('_')[0] + '.pdb'
+            pdb_filename = os.path.join(pl_dir, pl_file)
+            rmsd = 0
+
         selection_filename = os.path.join('../data', sel)
         with open(selection_filename, 'r') as f:
             sel = f.readline()
@@ -280,9 +296,7 @@ class RMSDDataset(Dataset):
         # Use to define center and size, and then a complex
         center = coords.mean(axis=0)[:3]
         center = tuple(center)
-        # print(coords.max(axis=0) - coords.min(axis=0))
-        size = 20
-        comp = Complex(points=coords, center=center, size=size)
+        comp = Complex(points=coords, center=center, size=self.size, spacing=self.spacing)
         return comp.grid, np.asarray(rmsd).astype(np.float32)
 
 
