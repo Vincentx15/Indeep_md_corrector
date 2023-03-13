@@ -18,11 +18,12 @@ sys.path.append(os.path.join(script_dir, ''))
 import utils
 
 
-def build_coord_channel(pdbfilename_p, selection=None):
+def build_selection(pdbfilename_p, selection=None):
     """
-    The goal is to go from pdb files and optionnally some selections to the (n,4) or (n,1) format of coordinates
-    annotated by their channel id
-    - pdbfilename_p: PDB file name for the protein
+    Clean other pymol objects and extract coordinates
+    :param pdbfilename_p:
+    :param selection:
+    :return:
     """
     # If cmd was initialized externally, remove conflicting names
     a = cmd.get_object_list('all')
@@ -35,12 +36,15 @@ def build_coord_channel(pdbfilename_p, selection=None):
     cmd.remove('hydrogens')
     prot_selection = 'prot and polymer.protein'
     selection = prot_selection if selection is None else prot_selection + ' and ' + selection
+    return selection
 
+
+def selection_to_split_coords(selection=None, state=0):
     # Store the coordinates in a (n, 4) array (coords_all)
     # with the last column corresponding to the channel id
     coords_all = None
     for cid, atomtype in enumerate(utils.ATOMTYPES):  # cid: channel id
-        coords = cmd.get_coords(selection=f'{selection} and ({utils.ATOMTYPES[atomtype]})')
+        coords = cmd.get_coords(selection=f'{selection} and ({utils.ATOMTYPES[atomtype]})', state=state)
         if coords is not None:
             if coords_all is None:
                 coords_all = np.c_[coords,
@@ -51,6 +55,16 @@ def build_coord_channel(pdbfilename_p, selection=None):
                 np.repeat(cid, coords.shape[0])]]
     coords_all = np.stack(coords_all)
     return coords_all
+
+
+def get_split_coords(pdbfilename_p, selection=None, state=0):
+    """
+    The goal is to go from pdb files and optionnally some selections to the (n,4) or (n,1)
+    format of coordinates annotated by their channel id
+    """
+    selection = build_selection(pdbfilename_p=pdbfilename_p, selection=selection)
+    coords = selection_to_split_coords(selection=selection, state=state)
+    return coords
 
 
 """
@@ -191,7 +205,7 @@ def get_enveloppe_grid(grid, gaussian_cutoff=0.2, iterations=6):
     return enveloppe
 
 
-class Complex(object):
+class GridComputer(object):
     def __init__(self, points, center, name=None, size=20, spacing=1., rotate=True, compute_enveloppe=False):
         """
         - protein: a string identifying the protein
@@ -291,12 +305,12 @@ class RMSDDataset(Dataset):
             sel = f.readline()
 
         # Based on that get coords
-        coords = build_coord_channel(pdbfilename_p=pdb_filename, selection=sel)
+        coords = get_split_coords(pdbfilename_p=pdb_filename, selection=sel)
 
         # Use to define center and size, and then a complex
         center = coords.mean(axis=0)[:3]
         center = tuple(center)
-        comp = Complex(points=coords, center=center, size=self.size, spacing=self.spacing)
+        comp = GridComputer(points=coords, center=center, size=self.size, spacing=self.spacing)
         return comp.grid, np.asarray(rmsd).astype(np.float32)
 
 
