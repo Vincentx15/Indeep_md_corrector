@@ -92,6 +92,7 @@ if __name__ == '__main__':
 
     model = RMSDModel()
     model.load_state_dict(torch.load(model_path))
+    model.to(device)
     ground_truth, prediction = validate(model=model, device=device, mse_fn=mse_fn, loader=val_loader)
     correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)

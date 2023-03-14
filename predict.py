@@ -284,7 +284,8 @@ def predict_traj(pdbfilename,
                  outfilename=None,
                  selection=None,
                  spacing=1.,
-                 size=20):
+                 size=20,
+                 max_frames=None):
     """
     Inference for validation on the small traj files.
     Assumption is clean PDB with just one chain.
@@ -293,11 +294,15 @@ def predict_traj(pdbfilename,
 
     # cmd.feedback('disable', 'all', 'everything')
     # chain = 'polymer.protein'
+    gpu_number = 0
+    device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
+
     if selection is None:
         box = f'polymer.protein'
     else:
         box = f'polymer.protein and {selection}'
 
+    cmd.reinitialize()
     cmd.load(pdbfilename, 'ref_pdb')
     cmd.load(pdbfilename, 'traj')
     cmd.load_traj(trajfilename, 'traj', state=1)
@@ -311,29 +316,26 @@ def predict_traj(pdbfilename,
     print('Number of atoms in prot', cmd.select('ref_pdb'))
     print('Number of atoms in traj', cmd.select('traj'))
     nstates = cmd.count_states('traj')
+    frames_to_use = nstates if max_frames is None else min(nstates, max_frames)
 
     if outfilename is None:
         outfilename = f'pred_rmsd.txt'
 
     predictions = list()
-
     with open(outfilename, 'w') as outfile:
         outfile.write(f'''# Topology file: {pdbfilename}
 # Trajectory file: {trajfilename}
 # Number of frames: {nstates}
 # Box selection: {box}\n''')
-        for state in range(nstates):
-            # for state in range(10):
-            # t0 = time.perf_counter()
+        for state in range(frames_to_use):
             # Get the coords of this specific frame from the traj cmd object.
             # Then from this object find the right box based on the box selection
-
             coords = selection_to_split_coords(selection=f'traj and {box}',
                                                state=state + 1)
             # Use to define center and size, and then a complex
             center = tuple(coords.mean(axis=0)[:3])
             grid = GridComputer(points=coords, center=center, size=size, spacing=spacing).grid
-            score = predict_frame(grid=grid, model=model)
+            score = predict_frame(grid=grid, model=model, device=device)
             predictions.append(score)
             outfile.write(f"{state},{score}\n")
             if not state % 500:
@@ -341,7 +343,7 @@ def predict_traj(pdbfilename,
     return predictions
 
 
-def evaluate_one(model, directory="data/md/XIAP1nw9HD/"):
+def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None):
     pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
     trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
@@ -350,13 +352,23 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/"):
     predictions = predict_traj(model=model,
                                pdbfilename=pdbfilename,
                                trajfilename=trajfilename,
-                               selection=sel)
+                               selection=sel,
+                               max_frames=max_frames)
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
-    ground_truth = rmsd_gt_csv['RMSD'].values
+    ground_truth = rmsd_gt_csv['RMSD'].values[:max_frames]
     correlation = scipy.stats.linregress(ground_truth, predictions)
     print(correlation)
     return correlation
 
+
+def evaluate_all(model, parent_directory="data/md/", max_frames=None):
+    all_res = dict()
+    for system in os.listdir(parent_directory):
+        system_directory = os.path.join(parent_directory, system)
+        correlation = evaluate_one(model=model, directory=system_directory, max_frames=max_frames)
+        rvalue = correlation.rvalue
+        all_res[system] = rvalue
+    return all_res
 
 
 if __name__ == '__main__':
@@ -370,9 +382,16 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(model_path))
     # model.eval()
 
-    path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
-    path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
-    with open(path_sel, 'r') as f:
-        sel = f.readline()
-    predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
-    evaluate_one(model)
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
+    # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
+    # with open(path_sel, 'r') as f:
+    #     sel = f.readline()
+    # predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
+
+    # corr_one = evaluate_one(model, max_frames=500)
+    # print(corr_one.rvalue)
+
+    all_res=evaluate_all(model, max_frames=200)
+
+
+
