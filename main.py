@@ -83,7 +83,13 @@ if __name__ == '__main__':
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
 
     train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
-    torch.save(model.state_dict(), 'first_model.pth')
+
+    model_path = 'first_model.pth'
+    model.cpu()
+    torch.save(model.state_dict(), model_path)
+
+    model = RMSDModel()
+    model.load_state_dict(torch.load(model_path))
     ground_truth, prediction = validate(model=model, device=device, mse_fn=mse_fn, loader=val_loader)
     correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)

@@ -11,15 +11,10 @@ import psico.fullinit
 import psico.helping
 import scipy.ndimage
 import scipy.spatial.distance
+import pandas as pd
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(script_dir, '..'))
-
-from indeep2.loader import GridComputer, get_split_coords
-from indeep2.model import RMSDModel
-# from data_processing import Density, Complex, pytorch_loading, utils
-# from learning import utils as lutils, model_factory
-
+from loader import GridComputer, selection_to_split_coords
+from model import RMSDModel
 import utils
 
 
@@ -50,7 +45,8 @@ def predict_frame(model, grid, device=None):
     # traced_script_module.save(model_dump_name)
     # sys.exit()
 
-    out = model(torch_grid).detach().cpu().numpy()
+    out = model(torch_grid)
+    out = out.detach().squeeze().cpu().numpy()
     return out
 
 
@@ -255,112 +251,89 @@ def do_small_pred(pdbfilename,
                   outfilename=None,
                   selection=None,
                   spacing=1.,
-                  margin=6):
+                  size=20):
     """
     Inference for validation on the small traj files.
     Assumption is clean PDB with just one chain.
     Give me the MD PDB, traj and selection for this system and I give you a prediction.
     """
 
-    cmd.feedback('disable', 'all', 'everything')
-    chain = 'polymer.protein'
-    box = f'polymer.protein and {selection}'
+    # cmd.feedback('disable', 'all', 'everything')
+    # chain = 'polymer.protein'
+    if selection is None:
+        box = f'polymer.protein'
+    else:
+        box = f'polymer.protein and {selection}'
 
     cmd.load(pdbfilename, 'ref_pdb')
+    cmd.load(pdbfilename, 'traj')
     cmd.load_traj(trajfilename, 'traj', state=1)
     # Align the coordinates of the trajectory onto the reference pdb
-    cmd.align('traj', 'ref_pdb', mobile_state=1)
-    cmd.delete('ref_pdb')
-    cmd.intra_fit(f'traj and name CA and {box}',
-                  state=1)  # Align the trajectory on the selected atoms on the first frame
+    cmd.align(mobile='traj', target='ref_pdb', mobile_state=1)
+    # cmd.delete('ref_pdb')
+    # Align the trajectory on the selected atoms on the first frame
+    cmd.intra_fit(f'traj and name CA and {box}', state=1)
     cmd.remove('hydrogens')
     print(cmd.get_object_list())
-    print('Number of atoms in prot', cmd.select('prot'))
+    print('Number of atoms in prot', cmd.select('ref_pdb'))
     print('Number of atoms in traj', cmd.select('traj'))
     nstates = cmd.count_states('traj')
 
     if outfilename is None:
         outfilename = f'pred_rmsd.txt'
 
+    predictions = list()
+
     with open(outfilename, 'w') as outfile:
         outfile.write(f'''# Topology file: {pdbfilename}
 # Trajectory file: {trajfilename}
 # Number of frames: {nstates}
-# Box selection: {box}
-{"volume"}\n''')
+# Box selection: {box}\n''')
         for state in range(nstates):
+            # for state in range(10):
             # t0 = time.perf_counter()
             # Get the coords of this specific frame from the traj cmd object.
             # Then from this object find the right box based on the box selection
 
-            coords = get_split_coords(pdbfilename_p=pdb_filename,
-                                      selection=f'traj and {box} and {chain}',
-                                      state=state + 1)
+            coords = selection_to_split_coords(selection=f'traj and {box}',
+                                               state=state + 1)
             # Use to define center and size, and then a complex
             center = tuple(coords.mean(axis=0)[:3])
-            grid = GridComputer(points=coords, center=center, size=20).grid
+            grid = GridComputer(points=coords, center=center, size=size, spacing=spacing).grid
             score = predict_frame(grid=grid, model=model)
+            predictions.append(score)
             outfile.write(f"{state},{score}\n")
+            if not state % 500:
+                print("Done", state, 'score : ', score)
+    return predictions
 
 
-small_pred = do_small_pred()
+def evaluate_one(model, directory="data/md/XIAP1nw9HD/"):
+    pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
+    trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
+    selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
+    with open(selection_filename, 'r') as f:
+        sel = f.readline()
+    predictions = do_small_pred(model=model,
+                                pdbfilename=pdbfilename,
+                                trajfilename=trajfilename,
+                                selection=sel)
+    rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
+    ground_truth = rmsd_gt_csv['RMSD'].values
+    correlation = scipy.stats.linregress(ground_truth, predictions)
+    print(correlation)
+    return correlation
+
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    default_exp_path = os.path.join(script_dir,
-                                    '../results/experiments/HPO.exp')
-    parser.add_argument('-e', '--exp', help='Experiment file name', default=default_exp_path, type=str)
-
-    subparsers = parser.add_subparsers(dest='command')
-
-    # # PDB PREDICTION
-    # parser_pdb = subparsers.add_parser('pdb')
-    # parser_pdb.add_argument('-p', '--pdb', help='pdb file name', type=str)
-    # parser_pdb.add_argument('-s', '--sel', help='Pymol selection for the prediction', type=str, default=None)
-    # parser_pdb.add_argument('--pdb_lig', help='pdb file name of the ligand', type=str, default=None)
-    # parser_pdb.add_argument('--sel_lig', help='Pymol selection for the ligand', type=str, default=None)
-    # parser_pdb.add_argument('-o', '--outname', help='Outname for the mrc or npz files', type=str, default=None)
-
-    # MD TRAJECTORY PREDICTION
-    parser_traj = subparsers.add_parser('traj')
-    parser_traj.add_argument('-p', '--pdb', help='PDB file name for the topology', type=str)
-    parser_traj.add_argument('-t', '--traj', help='File name of the trajectory', type=str)
-    parser_traj.add_argument('-b', '--box', help='Pymol selection for the prediction box definition', type=str,
-                             default=None)
-    parser_traj.add_argument('-c', '--chain', help='Pymol selection for the chain used for inference', type=str,
-                             default=None)
-    parser_traj.add_argument('-m', '--margin',
-                             help='Margin in Angstrom (but integer as grid spacing) to take around the selection',
-                             type=int, default=6)
-    parser_traj.add_argument('--ref', help='Reference pdb file to locate the pocket to track')
-    parser_traj.add_argument('--refsel', help='Atom selection to define pocket location')  # Out args
-    parser_traj.add_argument('-o', '--outname', help='file name for the scores', type=str, default='default_name')
     args = parser.parse_args()
 
-    # if args.command == 'pdb':
-    #     # python predict.py pdb -p ../1t4e.cif --no_mrc --project
-    #     predict_pdb(args.pdb,
-    #                 selection=args.sel,
-    #                 pdbfile_lig=args.pdb_lig,
-    #                 selection_lig=args.sel_lig, )
+    model = RMSDModel()
+    model_path = 'first_model.pth'
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
 
-    if args.command == 'traj':
-        pdb_filename = os.path.join('../data', args.pdb)
-        selection_filename = os.path.join('../data', args.sel)
-        with open(selection_filename, 'r') as f:
-            sel = f.readline()
-
-        pred_traj(args.pdb,
-                  args.traj,
-                  outfilename=args.outname,
-                  box=args.box,
-                  chain=args.chain,
-                  hetatm=args.pl,
-                  vol=args.vol,
-                  margin=args.margin,
-                  ranchor=args.ranchor,
-                  refpdb=args.ref,
-                  anchor_xyz=args.anchor,
-                  refsel=args.refsel)
+    evaluate_one(model)
