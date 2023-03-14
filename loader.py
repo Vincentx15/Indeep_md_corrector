@@ -276,7 +276,7 @@ class RMSDDataset(Dataset):
 
     def __init__(self,
                  data_root="data/low_rmsd",
-                 csv_to_read = "df_rmsd_train.csv",
+                 csv_to_read="df_rmsd_train.csv",
                  rotate=True,
                  get_pl_instead=0.5,
                  size=20,
@@ -301,6 +301,8 @@ class RMSDDataset(Dataset):
             pl_dir, decoy_file = os.path.split(pdb_filename)
             pl_file = decoy_file.split('_')[0] + '.pdb'
             pdb_filename = os.path.join(pl_dir, pl_file)
+            # Pdb files are shared with low_rmsd :
+            pdb_filename = pdb_filename.replace('high_rmsd', 'low_rmsd')
             rmsd = 0
 
         selection_filename = os.path.join(self.data_root, sel)

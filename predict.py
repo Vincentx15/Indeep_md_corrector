@@ -245,13 +245,46 @@ def predict_frame(model, grid, device=None):
 #                    margin:-margin] > 0.01
 #             score_old = np.sort(out_grid.flatten())[::-1][:vol].mean()
 
-def do_small_pred(pdbfilename,
-                  trajfilename,
-                  model,
-                  outfilename=None,
-                  selection=None,
-                  spacing=1.,
-                  size=20):
+
+def predict_pdb(pdbfilename,
+                model,
+                selection=None,
+                spacing=1.,
+                size=20):
+    """
+    Inference for validation on the small traj files.
+    Assumption is clean PDB with just one chain.
+    Give me the MD PDB, traj and selection for this system and I give you a prediction.
+    """
+
+    # cmd.feedback('disable', 'all', 'everything')
+    # chain = 'polymer.protein'
+    if selection is None:
+        box = f'polymer.protein'
+    else:
+        box = f'polymer.protein and {selection}'
+
+    # Align the trajectory on the selected atoms on the first frame
+    cmd.load(pdbfilename, 'prot')
+    cmd.remove('hydrogens')
+    print(cmd.get_object_list())
+    print('Number of atoms in prot', cmd.select('prot'))
+    coords = selection_to_split_coords(selection=f'prot and {box}')
+    # Use to define center and size, and then a complex
+    center = tuple(coords.mean(axis=0)[:3])
+    grid = GridComputer(points=coords, center=center, size=size, spacing=spacing).grid
+    score = predict_frame(grid=grid, model=model)
+    print(score)
+    return score
+
+
+def predict_traj(pdbfilename,
+                 trajfilename,
+                 model,
+                 outfilename=None,
+                 selection=None,
+                 spacing=1.,
+                 size=20):
     """
     Inference for validation on the small traj files.
     Assumption is clean PDB with just one chain.
@@ -314,15 +347,16 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/"):
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
     with open(selection_filename, 'r') as f:
         sel = f.readline()
-    predictions = do_small_pred(model=model,
-                                pdbfilename=pdbfilename,
-                                trajfilename=trajfilename,
-                                selection=sel)
+    predictions = predict_traj(model=model,
+                               pdbfilename=pdbfilename,
+                               trajfilename=trajfilename,
+                               selection=sel)
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
     ground_truth = rmsd_gt_csv['RMSD'].values
     correlation = scipy.stats.linregress(ground_truth, predictions)
     print(correlation)
     return correlation
+
 
 
 if __name__ == '__main__':
@@ -334,6 +368,11 @@ if __name__ == '__main__':
     model = RMSDModel()
     model_path = 'first_model.pth'
     model.load_state_dict(torch.load(model_path))
-    model.eval()
+    # model.eval()
 
+    path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
+    path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
+    with open(path_sel, 'r') as f:
+        sel = f.readline()
+    predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
     evaluate_one(model)

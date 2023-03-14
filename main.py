@@ -78,9 +78,9 @@ if __name__ == '__main__':
     mse_fn = torch.nn.MSELoss()
 
     spacing = 1
-
-    train_dataset = RMSDDataset(data_root="data/low_rmsd", csv_to_read="df_rmsd_train.csv", spacing=spacing)
-    val_dataset = RMSDDataset(data_root="data/low_rmsd/", csv_to_read="df_rmsd_validation.csv", spacing=spacing)
+    data_root = "data/low_rmsd"
+    train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
+    val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1, batch_size=30)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
 
