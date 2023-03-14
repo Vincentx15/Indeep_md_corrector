@@ -162,8 +162,7 @@ def predict_traj(pdbfilename,
                               spacing=spacing,
                               size=size,
                               max_frames=max_frames)
-    # torch_loader = DataLoader(dataset=torch_dataset, num_workers=os.cpu_count() - 1)
-    torch_loader = DataLoader(dataset=torch_dataset, num_workers=0)
+    torch_loader = DataLoader(dataset=torch_dataset, num_workers=os.cpu_count() - 1)
 
     predictions = list()
     with open(outfilename, 'w') as outfile:
@@ -199,12 +198,7 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None):
     return ground_truth, predictions
 
 
-def plot_one(ground_truth, predictions):
-    plt.scatter(ground_truth, predictions)
-    plt.show()
-
-
-def evaluate_all(model, parent_directory="data/md/", max_frames=None, save=True):
+def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None):
     all_res = dict()
     for system in os.listdir(parent_directory):
         system_directory = os.path.join(parent_directory, system)
@@ -213,10 +207,29 @@ def evaluate_all(model, parent_directory="data/md/", max_frames=None, save=True)
         print(correlation)
         rvalue = correlation.rvalue
         all_res[system] = rvalue
-        if save:
-            os.makedirs("dumps", exist_ok=True)
-            np.savez_compressed(f'dumps/{system}.npz', ground_truth=ground_truth, predictions=predictions)
+        if save_name is not None:
+            dir_path = os.path.join("dumps", save_name)
+            os.makedirs(dir_path, exist_ok=True)
+            dump_name = os.path.join(dir_path, f'{system}.npz')
+            np.savez_compressed(dump_name, ground_truth=ground_truth, predictions=predictions)
     return all_res
+
+
+def plot_all(save_name='first_model'):
+    fig, ax = plt.subplots(3, 3)
+    dumps_dir = os.path.join('dumps', save_name)
+    for i, system in enumerate(os.listdir(dumps_dir)):
+        system_dump = os.path.join(dumps_dir, system)
+        archive = np.load(system_dump)
+        ground_truth = archive['ground_truth']
+        predictions = archive['predictions']
+
+        current_ax = ax[i % 3, i // 3]
+        current_ax.scatter(ground_truth, predictions, alpha=0.03)
+        current_ax.set_title(system.split('.npz')[0])
+    fig.supxlabel('RMSD')
+    fig.supylabel('Prediction')
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -226,7 +239,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model = RMSDModel()
-    model_path = 'first_model.pth'
+    model_name = 'first_model'
+    model_path = os.path.join("saved_models", f'{model_name}.pth')
     model.load_state_dict(torch.load(model_path))
 
     # import torch.nn as nn
@@ -245,7 +259,8 @@ if __name__ == '__main__':
     # predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
 
     # gt, pred = evaluate_one(model, max_frames=500)
-    # plot_one(ground_truth=gt, predictions=pred)
 
-    all_res = evaluate_all(model, max_frames=None)
+    all_res = evaluate_all(model, max_frames=None, save_name=model_name)
     print(all_res)
+
+    # plot_all(save_name=model_name)

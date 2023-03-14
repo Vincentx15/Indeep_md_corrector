@@ -71,25 +71,32 @@ if __name__ == '__main__':
     # correct_df(in_csv)
     # sys.exit()
 
+    model_name = 'default.pth'
+    data_root = "data/low_rmsd"
+
+    # Setup learning
+    os.makedirs("saved_models", exist_ok=True)
+    model_path = os.path.join("saved_models", f'{model_name}.pth')
     gpu_number = 0
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
+
+    mse_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
-    mse_fn = torch.nn.MSELoss()
 
+    # Setup data
     spacing = 1
-    data_root = "data/low_rmsd"
     train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1, batch_size=30)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
 
-    model_path = 'first_model.pth'
-
+    # Train
     train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
     model.cpu()
     torch.save(model.state_dict(), model_path)
 
+    # Validate
     model = RMSDModel()
     model.load_state_dict(torch.load(model_path))
     model.to(device)
