@@ -4,6 +4,7 @@
 import os
 import sys
 
+import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from pymol import cmd
@@ -195,18 +196,26 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None):
                                max_frames=max_frames)
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
     ground_truth = rmsd_gt_csv['RMSD'].values[:max_frames]
-    correlation = scipy.stats.linregress(ground_truth, predictions)
-    print(correlation)
-    return correlation
+    return ground_truth, predictions
 
 
-def evaluate_all(model, parent_directory="data/md/", max_frames=None):
+def plot_one(ground_truth, predictions):
+    plt.scatter(ground_truth, predictions)
+    plt.show()
+
+
+def evaluate_all(model, parent_directory="data/md/", max_frames=None, save=True):
     all_res = dict()
     for system in os.listdir(parent_directory):
         system_directory = os.path.join(parent_directory, system)
-        correlation = evaluate_one(model=model, directory=system_directory, max_frames=max_frames)
+        ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames)
+        correlation = scipy.stats.linregress(ground_truth, predictions)
+        print(correlation)
         rvalue = correlation.rvalue
         all_res[system] = rvalue
+        if save:
+            os.makedirs("dumps", exist_ok=True)
+            np.savez_compressed(f'dumps/{system}.npz', ground_truth=ground_truth, predictions=predictions)
     return all_res
 
 
@@ -235,8 +244,8 @@ if __name__ == '__main__':
     #     sel = f.readline()
     # predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
 
-    # corr_one = evaluate_one(model, max_frames=50)
-    # print(corr_one.rvalue)
+    # gt, pred = evaluate_one(model, max_frames=500)
+    # plot_one(ground_truth=gt, predictions=pred)
 
-    all_res = evaluate_all(model, max_frames=1000)
+    all_res = evaluate_all(model, max_frames=None)
     print(all_res)
