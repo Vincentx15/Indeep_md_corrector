@@ -274,13 +274,16 @@ class GridComputer(object):
 
 class RMSDDataset(Dataset):
 
-    def __init__(self, csv_file="../data/data/df_rmsd_train.csv",
+    def __init__(self,
+                 data_root="data/low_rmsd",
+                 csv_to_read = "df_rmsd_train.csv",
                  rotate=True,
                  get_pl_instead=0.5,
                  size=20,
                  spacing=1.0):
+        self.data_root = data_root
+        csv_file = os.path.join(data_root, "data/", csv_to_read)
         self.df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
-        # self.df = pd.read_csv(csv_file)
         self.rotate = rotate
         self.get_pl_instead = get_pl_instead
         self.size = size
@@ -292,7 +295,7 @@ class RMSDDataset(Dataset):
     def __getitem__(self, item):
         row = self.df.iloc[item, :]
         pdb, sel, rmsd = row
-        pdb_filename = os.path.join('data', pdb)
+        pdb_filename = os.path.join(self.data_root, pdb)
         use_pl = self.get_pl_instead > random.random()
         if use_pl:
             pl_dir, decoy_file = os.path.split(pdb_filename)
@@ -300,7 +303,7 @@ class RMSDDataset(Dataset):
             pdb_filename = os.path.join(pl_dir, pl_file)
             rmsd = 0
 
-        selection_filename = os.path.join('data', sel)
+        selection_filename = os.path.join(self.data_root, sel)
         with open(selection_filename, 'r') as f:
             sel = f.readline()
 

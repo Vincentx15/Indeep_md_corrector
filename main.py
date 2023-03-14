@@ -48,6 +48,8 @@ def validate(model, device, mse_fn, loader):
             grids = grids.to(device)
             rmsds = rmsds.to(device)[:, None]
             out = model(grids)
+            # print(out)
+            # print(rmsds)
             loss = mse_fn(out, rmsds)
 
             predictions.append(out)
@@ -77,14 +79,14 @@ if __name__ == '__main__':
 
     spacing = 1
 
-    train_dataset = RMSDDataset("data/data/df_rmsd_train.csv", spacing=spacing)
-    val_dataset = RMSDDataset("data/data/df_rmsd_validation.csv", spacing=spacing)
+    train_dataset = RMSDDataset(data_root="data/low_rmsd", csv_to_read="df_rmsd_train.csv", spacing=spacing)
+    val_dataset = RMSDDataset(data_root="data/low_rmsd/", csv_to_read="df_rmsd_validation.csv", spacing=spacing)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1, batch_size=30)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
 
-    train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
-
     model_path = 'first_model.pth'
+
+    train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
     model.cpu()
     torch.save(model.state_dict(), model_path)
 
