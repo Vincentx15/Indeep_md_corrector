@@ -212,6 +212,9 @@ def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=
             os.makedirs(dir_path, exist_ok=True)
             dump_name = os.path.join(dir_path, f'{system}.npz')
             np.savez_compressed(dump_name, ground_truth=ground_truth, predictions=predictions)
+    print(all_res)
+    for k, v in sorted(all_res.items()):
+        print(v)
     return all_res
 
 
@@ -262,6 +265,5 @@ if __name__ == '__main__':
     # gt, pred = evaluate_one(model, max_frames=500)
 
     # all_res = evaluate_all(model, max_frames=None, save_name=model_name)
-    # print(all_res)
 
     plot_all(save_name=model_name)
