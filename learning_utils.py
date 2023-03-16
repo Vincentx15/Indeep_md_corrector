@@ -19,6 +19,10 @@ class RbfLoss:
         loss = self.cross_entropy(smoothed_preds, smoothed_labels)
         return loss
 
+    def to(self, device):
+        self.centers = self.centers.to(device)
+        return self
+
 
 if __name__ == "__main__":
     loss = RbfLoss(min_value=0, max_value=4, nbins=20)

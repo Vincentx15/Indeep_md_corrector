@@ -88,7 +88,7 @@ if __name__ == '__main__':
 
     # Learning hyperparameters
     n_epochs = 10
-    loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10)
+    loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
     # loss_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
