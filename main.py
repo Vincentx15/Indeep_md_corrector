@@ -88,13 +88,13 @@ if __name__ == '__main__':
 
     # Learning hyperparameters
     n_epochs = 10
-    loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
-    # loss_fn = torch.nn.MSELoss()
+    # loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
+    loss_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
-    spacing = 1.
+    spacing = 1
     batch_size = 30
     train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing)

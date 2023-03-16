@@ -12,10 +12,13 @@ class RbfLoss:
         self.cross_entropy = torch.nn.CrossEntropyLoss()
 
     def __call__(self, prediction, ground_truth):
-        pred_dists = torch.cdist(prediction, self.centers) / self.std
-        gt_dists = torch.cdist(ground_truth, self.centers) / self.std
-        smoothed_preds = torch.nn.Softmax(dim=1)(-pred_dists)
-        smoothed_labels = torch.nn.Softmax(dim=1)(-gt_dists)
+        dists_pred = torch.cdist(prediction, self.centers)
+        dists_gt = torch.cdist(ground_truth, self.centers)
+
+        smoothed_preds = torch.exp(-dists_pred / self.std)
+        # smoothed_preds = torch.nn.Softmax(dim=1)(-dists_pred / self.std)
+        smoothed_labels = torch.nn.Softmax(dim=1)(-dists_gt / self.std)
+
         loss = self.cross_entropy(smoothed_preds, smoothed_labels)
         return loss
 
@@ -25,11 +28,17 @@ class RbfLoss:
 
 
 if __name__ == "__main__":
-    loss = RbfLoss(min_value=0, max_value=4, nbins=20)
-    pred = torch.linspace(1, 3, 10)
-    gt = torch.linspace(1, 3, 10) - 0.1
+    loss = RbfLoss(min_value=0, max_value=4, nbins=2)
+    gt = torch.linspace(1, 3, steps=1)
+    pred1 = gt
+    pred2 = gt + 0.1
+    pred3 = gt + 10
 
-    pred = pred[:, None]
     gt = gt[:, None]
-    loss_value = loss(pred, gt)
-    print(loss_value)
+    pred1 = pred1[:, None]
+    pred2 = pred2[:, None]
+    pred3 = pred3[:, None]
+    loss_value_1 = loss(pred1, gt)
+    loss_value_2 = loss(pred2, gt)
+    loss_value_3 = loss(pred3, gt)
+    print(loss_value_1, loss_value_2, loss_value_3)

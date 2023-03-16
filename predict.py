@@ -241,11 +241,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     args = parser.parse_args()
 
-    model_name = 'third_model'
-
-    # model = RMSDModel()
-    # model_path = os.path.join("saved_models", f'{model_name}.pth')
-    # model.load_state_dict(torch.load(model_path))
+    model_name = 'eighth_model'
+    model = RMSDModel()
+    model_path = os.path.join("saved_models", f'{model_name}.pth')
+    model.load_state_dict(torch.load(model_path))
 
     # import torch.nn as nn
     # model.eval()
@@ -264,6 +263,6 @@ if __name__ == '__main__':
 
     # gt, pred = evaluate_one(model, max_frames=500)
 
-    # all_res = evaluate_all(model, max_frames=None, save_name=model_name)
+    all_res = evaluate_all(model, max_frames=None, save_name=model_name)
 
-    plot_all(save_name=model_name)
+    # plot_all(save_name=model_name)
