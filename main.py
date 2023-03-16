@@ -5,6 +5,7 @@ import scipy
 
 import torch
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 import pymol
 import pymol2
@@ -19,9 +20,10 @@ from loader import RMSDDataset
 from model import RMSDModel
 
 
-def train(model, device, optimizer, mse_fn, loader):
+def train(model, device, optimizer, mse_fn, loader, writer, n_epochs=10):
     time_init = time.time()
-    for epoch in range(10):
+
+    for epoch in range(n_epochs):
         for step, (grids, rmsds) in enumerate(loader):
             grids = grids.to(device)
             rmsds = rmsds.to(device)[:, None]
@@ -33,14 +35,18 @@ def train(model, device, optimizer, mse_fn, loader):
             optimizer.step()
 
             if not step % 20:
+                step_total = len(loader) * epoch + step
                 error_norm = torch.sqrt(loss).item()
                 rmsds_std = torch.std(rmsds).item()
                 print(
                     f"Epoch : {epoch} ; step : {step} ; loss : {loss.item():.5f} ; error norm : {error_norm:.5f} ;"
                     f" relative : {error_norm / rmsds_std:.5f} ; time : {time.time() - time_init:.1f}")
+                writer.add_scalar('train_loss', error_norm, step_total)
+                writer.add_scalar('train_rmsds_std', rmsds_std, step_total)
 
 
-def validate(model, device, mse_fn, loader):
+
+def validate(model, device, mse_fn, loader, writer):
     time_init = time.time()
     predictions, ground_truth = [], []
     with torch.no_grad():
@@ -76,23 +82,30 @@ if __name__ == '__main__':
 
     # Setup learning
     os.makedirs("saved_models", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
+    writer = SummaryWriter(log_dir=f"logs/{model_name}")
     model_path = os.path.join("saved_models", f'{model_name}.pth')
     gpu_number = 0
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
+    # Learning hyperparameters
+    n_epochs = 10
     mse_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
     spacing = 1
+    batch_size = 30
     train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing)
-    train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1, batch_size=30)
-    val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=30)
+    train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1,
+                              batch_size=batch_size)
+    val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=batch_size)
 
     # Train
-    train(model=model, device=device, mse_fn=mse_fn, loader=train_loader, optimizer=optimizer)
+    train(model=model, device=device, mse_fn=mse_fn, loader=train_loader,
+          optimizer=optimizer, writer=writer, n_epochs=n_epochs)
     model.cpu()
     torch.save(model.state_dict(), model_path)
 
