@@ -53,6 +53,10 @@ def predict_frame(model, grid, device=None):
     # sys.exit()
 
     out = model(torch_grid)
+
+    # categorical setting :
+    if len(out.shape) > 1:
+        out = torch.argmax(out, dim=1)
     out = out.detach().squeeze().cpu().numpy()
     return out
 
@@ -164,8 +168,9 @@ def predict_traj(pdbfilename,
                               size=size,
                               max_frames=max_frames)
     # batch_size = 1
-    # torch_loader = DataLoader(dataset=torch_dataset, num_workers=0, batch_size=batch_size)
-    torch_loader = DataLoader(dataset=torch_dataset, num_workers=os.cpu_count() - 10, batch_size=batch_size)
+    # num_workers=0
+    num_workers = max(os.cpu_count() - 10, 1)
+    torch_loader = DataLoader(dataset=torch_dataset, num_workers=num_workers, batch_size=batch_size)
     print_every = len(torch_loader) // 10
 
     predictions = list()
@@ -272,6 +277,7 @@ if __name__ == '__main__':
     # import time
     #
     # t = time.time()
+    # batch_size = 1
     # all_res = evaluate_all(model, max_frames=None, save_name=model_name, batch_size=batch_size)
     # print("Batched_time :", time.time() - t)
     # Unbatched time : 298

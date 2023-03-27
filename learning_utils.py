@@ -27,18 +27,41 @@ class RbfLoss:
         return self
 
 
-if __name__ == "__main__":
-    loss = RbfLoss(min_value=0, max_value=4, nbins=2)
-    gt = torch.linspace(1, 3, steps=1)
-    pred1 = gt
-    pred2 = gt + 0.1
-    pred3 = gt + 10
+def categorical_loss(prediction, ground_truth, bins=(1, 1.5, 2)):
+    """
+    <1 Ang, entre 1 et 1.5, entre 1.5 et 2, et plus de 2
+    :param prediction:
+    :param ground_truth:
+    :param bins:
+    :return:
+    """
+    # First let's bin the gt :
+    binned_gt = [ground_truth < bins[0]]
+    for i, (low, high) in enumerate(zip(bins, bins[1:])):
+        binned_gt.append(torch.logical_and(low <= ground_truth, ground_truth < high))
+    binned_gt.append(bins[-1] <= ground_truth)
+    binned_gt = torch.concat(binned_gt, 1).int()
+    targets = torch.argmax(binned_gt, dim=1)
+    return torch.nn.CrossEntropyLoss()(prediction, targets)
 
-    gt = gt[:, None]
-    pred1 = pred1[:, None]
-    pred2 = pred2[:, None]
-    pred3 = pred3[:, None]
-    loss_value_1 = loss(pred1, gt)
-    loss_value_2 = loss(pred2, gt)
-    loss_value_3 = loss(pred3, gt)
-    print(loss_value_1, loss_value_2, loss_value_3)
+
+if __name__ == "__main__":
+    # loss = RbfLoss(min_value=0, max_value=4, nbins=2)
+    # gt = torch.linspace(0, 3, steps=5)
+    # pred1 = gt
+    # pred2 = gt + 0.1
+    # pred3 = gt + 10
+    # gt = gt[:, None]
+    # pred1 = pred1[:, None]
+    # pred2 = pred2[:, None]
+    # pred3 = pred3[:, None]
+    # loss_value_1 = loss(pred1, gt)
+    # loss_value_2 = loss(pred2, gt)
+    # loss_value_3 = loss(pred3, gt)
+    # print(loss_value_1, loss_value_2, loss_value_3)
+
+    bins = (1, 1.5, 2)
+
+    gt = torch.linspace(0, 3, steps=5)[:, None]
+    pred = torch.randn(size=(len(gt), len(bins) + 1))
+    categorical_loss(pred, gt)

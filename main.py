@@ -18,7 +18,7 @@ sys.path.append(os.path.join(script_dir, ''))
 
 from loader import RMSDDataset
 from model import RMSDModel
-from learning_utils import RbfLoss
+from learning_utils import RbfLoss, categorical_loss
 from predict import evaluate_all
 
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # correct_df(in_csv)
     # sys.exit()
 
-    model_name = 'tenth'
+    model_name = 'categorical'
     data_root = "data/low_rmsd"
 
     # Setup learning
@@ -88,9 +88,10 @@ if __name__ == '__main__':
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
-    n_epochs = 30
+    n_epochs = 100
     # loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
-    loss_fn = torch.nn.MSELoss()
+    # loss_fn = torch.nn.MSELoss()
+    loss_fn = categorical_loss
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
