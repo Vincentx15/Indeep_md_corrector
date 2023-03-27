@@ -46,7 +46,7 @@ class RMSDModel(nn.Module):
         # self.fc = nn.ModuleList()
         # self.fc.append()
         self.fc1 = nn.Linear(256, 128)
-        self.fc2 = nn.Linear(128, 4)
+        self.fc2 = nn.Linear(128, 1)
 
     def forward(self, x):
         # augment channels, reduce size

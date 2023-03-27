@@ -1,6 +1,8 @@
 import sys, os
 
 import time
+
+import numpy as np
 import scipy
 
 import torch
@@ -22,7 +24,7 @@ from learning_utils import RbfLoss, categorical_loss
 from predict import evaluate_all
 
 
-def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10):
+def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_loader=None):
     time_init = time.time()
 
     for epoch in range(n_epochs):
@@ -45,9 +47,17 @@ def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10):
                     f"Epoch : {epoch} ; step : {step} ; loss : {loss.item():.5f} ; error norm : {error_norm:.5f} ;"
                     f" relative : {error_norm / rmsds_std:.5f} ; time : {time.time() - time_init:.1f}")
                 writer.add_scalar('train_loss', error_norm, step_total)
+        if val_loader is not None:
+            print("validation")
+            ground_truth, prediction = validate(model=model, device=device, loss_fn=loss_fn, loader=val_loader)
+            correlation = scipy.stats.linregress(ground_truth, prediction).rvalue
+            rmse = np.mean(np.sqrt((ground_truth - prediction) ** 2))
+            print(f'Validation mse={rmse}, correlation={correlation}')
+            writer.add_scalar('rmse_val', rmse, epoch)
+            writer.add_scalar('corr_val', correlation, epoch)
 
 
-def validate(model, device, mse_fn, loader):
+def validate(model, device, loss_fn, loader):
     time_init = time.time()
     predictions, ground_truth = [], []
     with torch.no_grad():
@@ -55,7 +65,7 @@ def validate(model, device, mse_fn, loader):
             grids = grids.to(device)
             rmsds = rmsds.to(device)[:, None]
             out = model(grids)
-            loss = mse_fn(out, rmsds)
+            loss = loss_fn(out, rmsds)
 
             predictions.append(out)
             ground_truth.append(rmsds)
@@ -76,7 +86,7 @@ if __name__ == '__main__':
     # correct_df(in_csv)
     # sys.exit()
 
-    model_name = 'categorical'
+    model_name = 'large'
     data_root = "data/low_rmsd"
 
     # Setup learning
@@ -88,27 +98,31 @@ if __name__ == '__main__':
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
-    n_epochs = 100
+    n_epochs = 1000
     # loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
-    # loss_fn = torch.nn.MSELoss()
-    loss_fn = categorical_loss
+    loss_fn = torch.nn.MSELoss()
+    # loss_fn = categorical_loss
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
     spacing = 1
-    batch_size = 30
-    train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
-    train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv", spacing=spacing)
+    batch_size = 64
+    train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
+                                  spacing=spacing, get_pl_instead=0.1)
+    train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
+                                  spacing=spacing, get_pl_instead=0.1)
     train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2])
-    val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing, )
+    val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv",
+                              spacing=spacing, get_pl_instead=0.)
+
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1,
                               batch_size=batch_size)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=batch_size)
 
     # Train
     train(model=model, device=device, loss_fn=loss_fn, loader=train_loader,
-          optimizer=optimizer, writer=writer, n_epochs=n_epochs)
+          optimizer=optimizer, writer=writer, n_epochs=n_epochs, val_loader=val_loader)
     model.cpu()
     torch.save(model.state_dict(), model_path)
 
@@ -116,8 +130,8 @@ if __name__ == '__main__':
     model = RMSDModel()
     model.load_state_dict(torch.load(model_path))
     model.to(device)
-    ground_truth, prediction = validate(model=model, device=device, mse_fn=loss_fn, loader=val_loader)
+    ground_truth, prediction = validate(model=model, device=device, loss_fn=loss_fn, loader=val_loader)
     correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)
 
-    evaluate_all(model)
+    evaluate_all(model, batch_size=1)

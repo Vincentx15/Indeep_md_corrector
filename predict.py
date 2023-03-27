@@ -195,7 +195,7 @@ def predict_traj(pdbfilename,
     return predictions
 
 
-def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=30):
+def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=1):
     pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
     trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
@@ -211,7 +211,7 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_
     return ground_truth, predictions
 
 
-def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=30):
+def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1):
     all_res = dict()
     for system in os.listdir(parent_directory):
         system_directory = os.path.join(parent_directory, system)
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     args = parser.parse_args()
 
-    model_name = 'long_train'
+    model_name = 'categorical'
     # model = RMSDModel()
     # model_path = os.path.join("saved_models", f'{model_name}.pth')
     # model.load_state_dict(torch.load(model_path))
