@@ -19,6 +19,7 @@ sys.path.append(os.path.join(script_dir, ''))
 from loader import RMSDDataset
 from model import RMSDModel
 from learning_utils import RbfLoss
+from predict import evaluate_all
 
 
 def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10):
@@ -75,7 +76,7 @@ if __name__ == '__main__':
     # correct_df(in_csv)
     # sys.exit()
 
-    model_name = 'default'
+    model_name = 'tenth'
     data_root = "data/low_rmsd"
 
     # Setup learning
@@ -87,7 +88,7 @@ if __name__ == '__main__':
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
-    n_epochs = 10
+    n_epochs = 30
     # loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
     loss_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
@@ -96,8 +97,10 @@ if __name__ == '__main__':
     # Setup data
     spacing = 1
     batch_size = 30
-    train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
-    val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing)
+    train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv", spacing=spacing)
+    train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv", spacing=spacing)
+    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2])
+    val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", spacing=spacing, )
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1,
                               batch_size=batch_size)
     val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=batch_size)
@@ -115,3 +118,5 @@ if __name__ == '__main__':
     ground_truth, prediction = validate(model=model, device=device, mse_fn=loss_fn, loader=val_loader)
     correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)
+
+    evaluate_all(model)

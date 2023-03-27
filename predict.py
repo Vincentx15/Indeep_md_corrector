@@ -116,9 +116,9 @@ class MDDataset(Dataset):
         # Align the trajectory on the selected atoms on the first frame
         cmd.intra_fit(f'traj and name CA and {self.box}', state=1)
         cmd.remove('hydrogens')
-        print(cmd.get_object_list())
-        print('Number of atoms in prot', cmd.select('ref_pdb'))
-        print('Number of atoms in traj', cmd.select('traj'))
+        # print(cmd.get_object_list())
+        # print('Number of atoms in prot', cmd.select('ref_pdb'))
+        # print('Number of atoms in traj', cmd.select('traj'))
         nstates = cmd.count_states('traj')
         self.frames_to_use = nstates if max_frames is None else min(nstates, max_frames)
         self.size = size
@@ -144,7 +144,8 @@ def predict_traj(pdbfilename,
                  selection=None,
                  spacing=1.,
                  size=20,
-                 max_frames=None):
+                 max_frames=None,
+                 batch_size=30):
     """
     Inference for validation on the small traj files.
     Assumption is clean PDB with just one chain.
@@ -155,14 +156,17 @@ def predict_traj(pdbfilename,
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     if outfilename is None:
-        outfilename = f'pred_rmsd.txt'
+        outfilename = f'rmsd.txt'
     torch_dataset = MDDataset(pdbfilename=pdbfilename,
                               trajfilename=trajfilename,
                               selection=selection,
                               spacing=spacing,
                               size=size,
                               max_frames=max_frames)
-    torch_loader = DataLoader(dataset=torch_dataset, num_workers=os.cpu_count() - 1)
+    # batch_size = 1
+    # torch_loader = DataLoader(dataset=torch_dataset, num_workers=0, batch_size=batch_size)
+    torch_loader = DataLoader(dataset=torch_dataset, num_workers=os.cpu_count() - 10, batch_size=batch_size)
+    print_every = len(torch_loader) // 10
 
     predictions = list()
     with open(outfilename, 'w') as outfile:
@@ -170,19 +174,23 @@ def predict_traj(pdbfilename,
 # Trajectory file: {trajfilename}
 # Number of frames: {len(torch_loader)}
 # Box selection: {torch_dataset.box}\n''')
-        for item, grid in torch_loader:
+        for i, (items, grids) in enumerate(torch_loader):
             # Get the coords of this specific frame from the traj cmd object.
             # Then from this object find the right box based on the box selection
-            item = int(item)
-            score = predict_frame(grid=grid, model=model, device=device)
-            predictions.append(score)
-            outfile.write(f"{item},{score}\n")
-            if not item % 250:
-                print("Done", item, 'score : ', score)
+            items = list(items.cpu().numpy())
+            scores = predict_frame(grid=grids, model=model, device=device)
+            if batch_size == 1:
+                scores = scores.reshape((1,))
+            predictions.append(scores)
+            for item, score in zip(items, scores):
+                outfile.write(f"{item},{score}\n")
+            if not i % print_every:
+                print("Done", i * batch_size, 'score : ', score)
+    predictions = np.concatenate(predictions, axis=0)
     return predictions
 
 
-def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None):
+def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=30):
     pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
     trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
@@ -192,17 +200,18 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None):
                                pdbfilename=pdbfilename,
                                trajfilename=trajfilename,
                                selection=sel,
-                               max_frames=max_frames)
+                               max_frames=max_frames, batch_size=batch_size)
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
     ground_truth = rmsd_gt_csv['RMSD'].values[:max_frames]
     return ground_truth, predictions
 
 
-def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None):
+def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=30):
     all_res = dict()
     for system in os.listdir(parent_directory):
         system_directory = os.path.join(parent_directory, system)
-        ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames)
+        ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames,
+                                                 batch_size=batch_size)
         correlation = scipy.stats.linregress(ground_truth, predictions)
         print(correlation)
         rvalue = correlation.rvalue
@@ -241,19 +250,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     args = parser.parse_args()
 
-    model_name = 'eighth_model'
-    model = RMSDModel()
-    model_path = os.path.join("saved_models", f'{model_name}.pth')
-    model.load_state_dict(torch.load(model_path))
-
-    # import torch.nn as nn
-    # model.eval()
-    # for m in model.modules():
-    #     for child in m.children():
-    #         if type(child) == nn.BatchNorm3d:
-    #             child.track_running_stats = False
-    #             child.running_mean = None
-    #             child.running_var = None
+    model_name = 'long_train'
+    # model = RMSDModel()
+    # model_path = os.path.join("saved_models", f'{model_name}.pth')
+    # model.load_state_dict(torch.load(model_path))
+    # mode_eval = False
+    # if mode_eval:
+    #     model.eval()
+    #     batch_size = 30
+    # else:
+    #     batch_size = 1
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
@@ -261,8 +267,13 @@ if __name__ == '__main__':
     #     sel = f.readline()
     # predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
 
-    # gt, pred = evaluate_one(model, max_frames=500)
+    # gt, pred = evaluate_one(model, max_frames=50)
 
-    all_res = evaluate_all(model, max_frames=None, save_name=model_name)
-
-    # plot_all(save_name=model_name)
+    # import time
+    #
+    # t = time.time()
+    # all_res = evaluate_all(model, max_frames=None, save_name=model_name, batch_size=batch_size)
+    # print("Batched_time :", time.time() - t)
+    # Unbatched time : 298
+    # Batched time : 175
+    plot_all(save_name=model_name)
