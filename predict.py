@@ -212,13 +212,17 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_
 
 
 def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1):
+    if isinstance(model, str):
+        model_path = os.path.join("saved_models", f'{model}.pth')
+        model = RMSDModel()
+        model.load_state_dict(torch.load(model_path))
     all_res = dict()
-    for system in os.listdir(parent_directory):
+    for system in sorted(os.listdir(parent_directory)):
         system_directory = os.path.join(parent_directory, system)
         ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames,
                                                  batch_size=batch_size)
         correlation = scipy.stats.linregress(ground_truth, predictions)
-        print(correlation)
+        print(system, correlation)
         rvalue = correlation.rvalue
         all_res[system] = rvalue
         if save_name is not None:
@@ -227,7 +231,7 @@ def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=
             dump_name = os.path.join(dir_path, f'{system}.npz')
             np.savez_compressed(dump_name, ground_truth=ground_truth, predictions=predictions)
     print(all_res)
-    for k, v in sorted(all_res.items()):
+    for k, v in all_res.items():
         print(v)
     return all_res
 
@@ -253,18 +257,10 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
+    parser.add_argument("-m", "--model")
     args = parser.parse_args()
 
-    model_name = 'long_train'
-    model = RMSDModel()
-    model_path = os.path.join("saved_models", f'{model_name}.pth')
-    model.load_state_dict(torch.load(model_path))
-    mode_eval = False
-    if mode_eval:
-        model.eval()
-        batch_size = 30
-    else:
-        batch_size = 1
+    model_name = args.model
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
@@ -276,10 +272,8 @@ if __name__ == '__main__':
 
     # import time
     #
-    # t = time.time()
     # batch_size = 1
-    all_res = evaluate_all(model, max_frames=None, save_name=model_name, batch_size=batch_size)
-    # print("Batched_time :", time.time() - t)
+    # all_res = evaluate_all(model_name, max_frames=None, save_name=model_name)
     # Unbatched time : 298
     # Batched time : 175
-    # plot_all(save_name=model_name)
+    plot_all(save_name=model_name)

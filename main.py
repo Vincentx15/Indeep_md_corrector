@@ -56,6 +56,12 @@ def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_lo
             writer.add_scalar('rmse_val', rmse, epoch)
             writer.add_scalar('corr_val', correlation, epoch)
 
+        if not epoch % 50:
+        # if epoch > 10 and not epoch % 50:
+            all_res = evaluate_all(model)
+            mean_md_corr = np.mean([v for v in all_res.values()])
+            writer.add_scalar('MD_validation', mean_md_corr, epoch)
+
 
 def validate(model, device, loss_fn, loader):
     time_init = time.time()
