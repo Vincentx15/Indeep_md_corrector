@@ -257,10 +257,10 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-m", "--model")
+    parser.add_argument("-m", "--model_name")
     args = parser.parse_args()
 
-    model_name = args.model
+    model_name = args.model_name
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
