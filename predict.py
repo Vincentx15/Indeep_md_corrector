@@ -55,7 +55,7 @@ def predict_frame(model, grid, device=None):
     out = model(torch_grid)
 
     # categorical setting :
-    if len(out.shape) > 1:
+    if out.shape[1] > 1:
         out = torch.argmax(out, dim=1)
     out = out.detach().squeeze().cpu().numpy()
     return out
@@ -255,16 +255,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     args = parser.parse_args()
 
-    model_name = 'categorical'
-    # model = RMSDModel()
-    # model_path = os.path.join("saved_models", f'{model_name}.pth')
-    # model.load_state_dict(torch.load(model_path))
-    # mode_eval = False
-    # if mode_eval:
-    #     model.eval()
-    #     batch_size = 30
-    # else:
-    #     batch_size = 1
+    model_name = 'long_train'
+    model = RMSDModel()
+    model_path = os.path.join("saved_models", f'{model_name}.pth')
+    model.load_state_dict(torch.load(model_path))
+    mode_eval = False
+    if mode_eval:
+        model.eval()
+        batch_size = 30
+    else:
+        batch_size = 1
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
@@ -278,8 +278,8 @@ if __name__ == '__main__':
     #
     # t = time.time()
     # batch_size = 1
-    # all_res = evaluate_all(model, max_frames=None, save_name=model_name, batch_size=batch_size)
+    all_res = evaluate_all(model, max_frames=None, save_name=model_name, batch_size=batch_size)
     # print("Batched_time :", time.time() - t)
     # Unbatched time : 298
     # Batched time : 175
-    plot_all(save_name=model_name)
+    # plot_all(save_name=model_name)
