@@ -303,6 +303,7 @@ class RMSDDataset(Dataset):
             pdb_filename = os.path.join(pl_dir, pl_file)
             # Pdb files are shared with low_rmsd :
             pdb_filename = pdb_filename.replace('high_rmsd', 'low_rmsd')
+            pdb_filename = pdb_filename.replace('double_rmsd', 'low_rmsd')
             rmsd = 0
 
         selection_filename = os.path.join(self.data_root, sel)

@@ -112,7 +112,9 @@ if __name__ == '__main__':
                                   spacing=spacing, get_pl_instead=0.1)
     train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
                                   spacing=spacing, get_pl_instead=0.1)
-    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2])
+    train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
+                                  spacing=spacing, get_pl_instead=0.1)
+    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3])
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv",
                               spacing=spacing, get_pl_instead=0.)
 
@@ -134,4 +136,4 @@ if __name__ == '__main__':
     correlation = scipy.stats.linregress(ground_truth, prediction)
     print(correlation)
 
-    evaluate_all(model, batch_size=1)
+    evaluate_all(model, batch_size=1, save_name=model_name)
