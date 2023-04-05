@@ -64,6 +64,8 @@ def save_density(density, outfilename, spacing, origin, padding):
         mrc.header['origin']['z'] = origin[2] - padding
         mrc.update_header_from_data()
         mrc.update_header_stats()
+
+
 #
 # def pdbcode_to_path(pdbcode, filename=None, prepend_dir=None):
 #     """
@@ -268,7 +270,8 @@ def save_density(density, outfilename, spacing, origin, padding):
 #     return rmsd_refine
 #
 #
-# if __name__ == '__main__':
-#     import doctest
-#
-#     doctest.testmod(optionflags=doctest.ELLIPSIS)
+if __name__ == '__main__':
+    in_csv = "../InDeep_holo-like_pred_toVincent/data/df_rmsd_validation.csv"
+    # in_csv = "../data/data/df_rmsd_test.csv"
+    correct_df(in_csv)
+

@@ -36,7 +36,7 @@ class RMSDModel(nn.Module):
     Perform 3D conv, BN and elu activation to go from in_channels to out_channels
     """
 
-    def __init__(self, channels=(5, 128, 256, 512)):
+    def __init__(self, channels=(5, 128, 256, 512, 512)):
         super(RMSDModel, self).__init__()
         self.convs = nn.ModuleList()
         for prev, next in zip(channels, channels[1:]):

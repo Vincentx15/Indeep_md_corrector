@@ -86,19 +86,15 @@ def validate(model, device, loss_fn, loader):
 
 
 if __name__ == '__main__':
-    # from utils import correct_df
-    # in_csv = "../InDeep_holo-like_pred_toVincent/data/df_rmsd_validation.csv"
-    # in_csv = "../data/data/df_rmsd_test.csv"
-    # correct_df(in_csv)
-    # sys.exit()
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-m", "--model_name", default='large_mixed')
+    parser.add_argument("-m", "--model_name", default='default')
+    parser.add_argument("--nw", type=int, default=None)
     parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
 
-    model_name = args.model
+    model_name = args.model_name
     data_root = "data/low_rmsd"
 
     # Setup learning
@@ -106,20 +102,20 @@ if __name__ == '__main__':
     os.makedirs("logs", exist_ok=True)
     writer = SummaryWriter(log_dir=f"logs/{model_name}")
     model_path = os.path.join("saved_models", f'{model_name}.pth')
-    gpu_number = args.gpu_number
+    gpu_number = args.gpu
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
-    n_epochs = 500
-    # loss_fn = RbfLoss(min_value=0, max_value=4, nbins=10).to(device)
+    n_epochs = 250
     loss_fn = torch.nn.MSELoss()
-    # loss_fn = categorical_loss
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
-    spacing = 1
+    spacing = 0.63
     batch_size = 32
+    num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
+
     train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
                                   spacing=spacing, get_pl_instead=0.1)
     train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
@@ -129,10 +125,8 @@ if __name__ == '__main__':
     train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3])
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv",
                               spacing=spacing, get_pl_instead=0.)
-
-    train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=os.cpu_count() - 1,
-                              batch_size=batch_size)
-    val_loader = DataLoader(dataset=val_dataset, num_workers=os.cpu_count() - 1, batch_size=batch_size)
+    train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=num_workers, batch_size=batch_size)
+    val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size)
 
     # Train
     train(model=model, device=device, loss_fn=loss_fn, loader=train_loader,
