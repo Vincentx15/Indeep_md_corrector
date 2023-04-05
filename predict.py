@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: UTF8 -*-
-
 import os
 import sys
 
@@ -17,9 +14,59 @@ import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 
-from loader import GridComputer, selection_to_split_coords
+from loader import GridComputer, selection_to_split_coords, RMSDDataset
 from model import RMSDModel
 import utils
+import time
+
+
+def predict(model, device, loader):
+    predictions, ground_truth = [], []
+    with torch.no_grad():
+        for step, (grids, rmsds) in enumerate(loader):
+            grids = grids.to(device)
+            rmsds = rmsds.to(device)[:, None]
+            out = model(grids)
+            predictions.append(out)
+            ground_truth.append(rmsds)
+    ground_truth = torch.squeeze(torch.cat(ground_truth, dim=0)).cpu().numpy()
+    predictions = torch.squeeze(torch.cat(predictions, dim=0)).cpu().numpy()
+    return ground_truth, predictions
+
+
+def build_pl_csv(data_root="data/low_rmsd",
+                 csv_to_read="df_rmsd_train.csv"):
+    """
+    Build a csv in a similar format that the one for rosetta's files, for the PL files
+    One needs to do it in a non redundant way
+    """
+    csv_file = os.path.join(data_root, "data/", csv_to_read)
+    csv_to_dump = os.path.join(data_root, "data/", csv_to_read.replace('rmsd', 'pl'))
+
+    df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
+    existing_rows = set()
+    new_df = pd.DataFrame(columns=df.columns)
+    for i, row in df.iterrows():
+        path_pdb, path_resi, rmsd = row.values
+        pl_dir, decoy_file = os.path.split(path_pdb)
+        pl_file = decoy_file.split('_')[0] + '.pdb'
+        if not pl_file in existing_rows:
+            existing_rows.add(pl_file)
+            pdb_filename = os.path.join(pl_dir, pl_file)
+            row = pdb_filename, path_resi, 0
+            new_df.loc[len(new_df)] = row
+    new_df.to_csv(csv_to_dump)
+
+
+def validate(model, device, loader, writer=None, epoch=0):
+    ground_truth, prediction = predict(model=model, device=device, loader=loader)
+    correlation = scipy.stats.linregress(ground_truth, prediction).rvalue
+    rmse = np.mean(np.sqrt((ground_truth - prediction) ** 2))
+    print(f'Validation mse={rmse}, correlation={correlation}')
+    if writer is not None:
+        writer.add_scalar('rmse_val', rmse, epoch)
+        writer.add_scalar('corr_val', correlation, epoch)
+    return correlation, rmse
 
 
 def predict_frame(model, grid, device=None):
@@ -261,6 +308,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model_name = args.model_name
+
+    # build_pl_csv(csv_to_read="df_rmsd_train.csv")
+    # build_pl_csv(csv_to_read="df_rmsd_validation.csv")
+    # build_pl_csv(csv_to_read="df_rmsd_test.csv")
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
