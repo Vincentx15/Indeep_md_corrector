@@ -67,6 +67,19 @@ def get_split_coords(pdbfilename_p, selection=None, state=0):
     return coords
 
 
+def random_rotate(coords, center=None):
+    """
+    Randomly rotate the coordinates of both proteins and ligands
+    """
+    alpha, beta, gamma = np.random.uniform(low=0., high=360., size=3)
+    r = R.from_euler('zyx', [alpha, beta, gamma], degrees=True)
+    # print(coords[:3])
+    com = coords.mean(axis=0) if center is None else center
+    coords_0 = coords - com
+    rotated_shifted = r.apply(coords_0) + com
+    return rotated_shifted
+
+
 """
 Make the conversion from (n,4) matrices to the grid format.
 It also introduces the 'Complex' class that is fulling the Database object
@@ -119,38 +132,7 @@ def just_one(coord, xi, yi, zi, sigma, feature, total_grid, use_multiprocessing=
         return min_bounds_x, max_bounds_x, min_bounds_y, max_bounds_y, min_bounds_z, max_bounds_z, subgrid_feature
 
 
-def gaussian_blur(coords, xi, yi, zi, features=None, sigma=1., use_multiprocessing=False):
-    """
-
-    :param coords: (n_points, 3)
-    :param xi:
-    :param yi:
-    :param zi:
-    :param features: (n_points, dim) or None
-    :param sigma:
-    :param use_multiprocessing:
-    :return:
-    """
-
-    nx, ny, nz = xi.size, yi.size, zi.size
-    features = np.ones((len(coords), 1)) if features is None else features
-    feature_len = features.shape[1]
-    total_grid = np.zeros(shape=(feature_len, nx, ny, nz))
-
-    if use_multiprocessing:
-        import multiprocessing
-        args = [(coord, xi, yi, zi, sigma, features[i], None, True) for i, coord in enumerate(coords)]
-        pool = multiprocessing.Pool()
-        grids_to_add = pool.starmap(just_one, args)
-        for min_bounds_x, max_bounds_x, min_bounds_y, max_bounds_y, min_bounds_z, max_bounds_z, subgrid in grids_to_add:
-            total_grid[:, min_bounds_x: max_bounds_x, min_bounds_y: max_bounds_y, min_bounds_z:max_bounds_z] += subgrid
-    else:
-        for i, coord in enumerate(coords):
-            just_one(coord, feature=features[i], xi=xi, yi=yi, zi=zi, sigma=sigma, total_grid=total_grid)
-    return total_grid
-
-
-def get_grid(coords, features=None, spacing=2., padding=3, xyz_min=None, xyz_max=None, sigma=1.):
+def get_grid(coords, xi, yi, zi, features=None, sigma=1.):
     """
     Generate a grid from the coordinates
     :param coords: (n,3) array
@@ -163,30 +145,13 @@ def get_grid(coords, features=None, spacing=2., padding=3, xyz_min=None, xyz_max
     :return:
     """
 
-    def get_bins(coords, spacing, padding, xyz_min=None, xyz_max=None):
-        """
-        Compute the 3D bins from the coordinates
-        """
-        if xyz_min is None:
-            xm, ym, zm = coords.min(axis=0) - padding
-        else:
-            xm, ym, zm = xyz_min - padding
-        if xyz_max is None:
-            xM, yM, zM = coords.max(axis=0) + padding
-        else:
-            xM, yM, zM = xyz_max + padding
+    nx, ny, nz = xi.size, yi.size, zi.size
+    feature_len = features.shape[1]
+    total_grid = np.zeros(shape=(feature_len, nx, ny, nz))
 
-        # print(xm)
-        # print(xM)
-        # print(spacing)
-        xi = np.arange(xm, xM, spacing)
-        yi = np.arange(ym, yM, spacing)
-        zi = np.arange(zm, zM, spacing)
-        return xi, yi, zi
-
-    xi, yi, zi = get_bins(coords, spacing, padding, xyz_min, xyz_max)
-    grid = gaussian_blur(coords, xi, yi, zi, features=features, sigma=sigma)
-    return grid
+    for i, coord in enumerate(coords):
+        just_one(coord, feature=features[i], xi=xi, yi=yi, zi=zi, sigma=sigma, total_grid=total_grid)
+    return total_grid
 
 
 def get_enveloppe_grid(grid, gaussian_cutoff=0.2, iterations=6):
@@ -206,7 +171,7 @@ def get_enveloppe_grid(grid, gaussian_cutoff=0.2, iterations=6):
 
 
 class GridComputer(object):
-    def __init__(self, points, center, name=None, size=20, spacing=1., rotate=True, compute_enveloppe=False):
+    def __init__(self, points, center, name=None, grid_size=20, spacing=1., rotate=True, compute_enveloppe=False):
         """
         - protein: a string identifying the protein
         - rotate: if True, randomly rotate the coordinates of the complex
@@ -215,47 +180,19 @@ class GridComputer(object):
         self.center = center
         self.spacing = spacing
         self.ids, coords = np.int32(points[:, -1]), points[:, :3]
-        self.coords = self.random_rotate(coords) if rotate else coords
-        self.xyz_min, self.xyz_max = np.asarray(center) - size // 2, np.asarray(center) + size // 2 + 0.0001
-
-        self.grid = self.compute_grid()
-        if compute_enveloppe:
-            self.enveloppe = self.compute_enveloppe_grid()
-
-    @staticmethod
-    def random_rotate(coords, center=None):
-        """
-        Randomly rotate the coordinates of both proteins and ligands
-        """
-        alpha, beta, gamma = np.random.uniform(low=0., high=360., size=3)
-        r = R.from_euler('zyx', [alpha, beta, gamma], degrees=True)
-        # print(coords[:3])
-        com = coords.mean(axis=0) if center is None else center
-        coords_0 = coords - com
-        rotated_shifted = r.apply(coords_0) + com
-        # print(rotated_shifted[:3])
-        return rotated_shifted
-
-    def compute_grid(self):
-        """
-        Return the grid (with channels) for the protein
-        with the corresponding channel ids (x, y, z, channel_id)
-        """
+        self.coords = random_rotate(coords) if rotate else coords
+        self.xyz_min = np.asarray(center) - (grid_size * spacing) / 2
+        bins = np.arange(0, grid_size) * spacing
+        shifted_bins = bins[None, :] + self.xyz_min[:, None]
+        self.xyz_max = np.max(shifted_bins, axis=1)
+        xi, yi, zi = shifted_bins
         one_hot = np.eye(len(utils.ATOMTYPES))[self.ids]
-        grid = get_grid(coords=self.coords,
-                        features=one_hot,
-                        spacing=self.spacing,
-                        padding=0,
-                        xyz_min=self.xyz_min,
-                        xyz_max=self.xyz_max)
-        return grid.astype(np.float32)
-
-    def compute_enveloppe_grid(self):
-        """
-        Return the grid (with channels) for the protein
-        with the corresponding channel ids (x, y, z, channel_id)
-        """
-        return get_enveloppe_grid(self.grid)
+        grid = get_grid(coords, xi, yi, zi, features=one_hot)
+        self.grid = grid.astype(np.float32)
+        # print("spatial_size", self.xyz_max - self.xyz_min)
+        # print("grid_size", grid.shape)
+        if compute_enveloppe:
+            self.enveloppe = get_enveloppe_grid(self.grid)
 
     def save_mrc_prot(self):
         """
@@ -279,14 +216,14 @@ class RMSDDataset(Dataset):
                  csv_to_read="df_rmsd_train.csv",
                  rotate=True,
                  get_pl_instead=0.5,
-                 size=20,
+                 grid_size=20,
                  spacing=1.0):
         self.data_root = data_root
         csv_file = os.path.join(data_root, "data/", csv_to_read)
         self.df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
         self.rotate = rotate
         self.get_pl_instead = get_pl_instead
-        self.size = size
+        self.grid_size = grid_size
         self.spacing = spacing
 
     def __len__(self):
@@ -316,8 +253,9 @@ class RMSDDataset(Dataset):
         # Use to define center and size, and then a complex
         center = coords.mean(axis=0)[:3]
         center = tuple(center)
-        comp = GridComputer(points=coords, center=center, size=self.size, spacing=self.spacing)
-        return comp.grid, np.asarray(rmsd).astype(np.float32)
+        comp = GridComputer(points=coords, center=center, rotate=self.rotate,
+                            grid_size=self.grid_size, spacing=self.spacing)
+        return pdb_filename, comp.grid, np.asarray(rmsd).astype(np.float32)
 
 
 if __name__ == '__main__':

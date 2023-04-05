@@ -14,7 +14,7 @@ import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 
-from loader import GridComputer, selection_to_split_coords, RMSDDataset
+from loader import GridComputer, selection_to_split_coords
 from model import RMSDModel
 import utils
 import time
@@ -23,7 +23,7 @@ import time
 def predict(model, device, loader):
     predictions, ground_truth = [], []
     with torch.no_grad():
-        for step, (grids, rmsds) in enumerate(loader):
+        for step, (names, grids, rmsds) in enumerate(loader):
             grids = grids.to(device)
             rmsds = rmsds.to(device)[:, None]
             out = model(grids)
@@ -38,7 +38,7 @@ def build_pl_csv(data_root="data/low_rmsd",
                  csv_to_read="df_rmsd_train.csv"):
     """
     Build a csv in a similar format that the one for rosetta's files, for the PL files
-    One needs to do it in a non redundant way
+    One needs to do it in a non-redundant way
     """
     csv_file = os.path.join(data_root, "data/", csv_to_read)
     csv_to_dump = os.path.join(data_root, "data/", csv_to_read.replace('rmsd', 'pl'))
@@ -134,7 +134,7 @@ def predict_pdb(pdbfilename,
     coords = selection_to_split_coords(selection=f'prot and {box}')
     # Use to define center and size, and then a complex
     center = tuple(coords.mean(axis=0)[:3])
-    grid = GridComputer(points=coords, center=center, size=size, spacing=spacing).grid
+    grid = GridComputer(points=coords, center=center, grid_size=size, spacing=spacing).grid
     score = predict_frame(grid=grid, model=model)
     print(score)
     return score
@@ -184,7 +184,7 @@ class MDDataset(Dataset):
                                            state=item + 1)
         # Use to define center and size, and then a complex
         center = tuple(coords.mean(axis=0)[:3])
-        grid = GridComputer(points=coords, center=center, rotate=False, size=self.size, spacing=self.spacing).grid
+        grid = GridComputer(points=coords, center=center, rotate=False, grid_size=self.size, spacing=self.spacing).grid
         return item, grid
 
 

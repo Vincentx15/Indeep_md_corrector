@@ -24,7 +24,7 @@ def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_lo
     time_init = time.time()
 
     for epoch in range(n_epochs):
-        for step, (grids, rmsds) in enumerate(loader):
+        for step, (names, grids, rmsds) in enumerate(loader):
             grids = grids.to(device)
             rmsds = rmsds.to(device)[:, None]
 
@@ -58,7 +58,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-m", "--model_name", default='default')
+    parser.add_argument("-m", "--model_name", default='long_train')
     parser.add_argument("--nw", type=int, default=None)
     parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
@@ -75,25 +75,26 @@ if __name__ == '__main__':
     device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
-    n_epochs = 250
+    n_epochs = 500
     loss_fn = torch.nn.MSELoss()
     model = RMSDModel().to(device)
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
-    spacing = 0.63
+    spacing = 0.65
+    grid_size = 32
     batch_size = 32
     num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
 
     train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, get_pl_instead=0.1)
+                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
     train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, get_pl_instead=0.1)
+                                  spacing=spacing,grid_size=grid_size, get_pl_instead=0.1)
     train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, get_pl_instead=0.1)
+                                  spacing=spacing,grid_size=grid_size, get_pl_instead=0.1)
     train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3])
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", rotate=False,
-                              spacing=spacing, get_pl_instead=0.)
+                              spacing=spacing, grid_size=grid_size,get_pl_instead=0.)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=num_workers, batch_size=batch_size)
     val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size)
 
@@ -113,11 +114,20 @@ if __name__ == '__main__':
     pl_dataset = RMSDDataset(data_root="data/low_rmsd",
                              csv_to_read="df_pl_validation.csv",
                              spacing=spacing,
+                             grid_size=grid_size,
                              rotate=False,
                              get_pl_instead=0)
-    # val_dataset_pl = pl_dataset
     val_dataset_pl = torch.utils.data.ConcatDataset([val_dataset, pl_dataset])
     val_loader_pl = DataLoader(dataset=val_dataset_pl, num_workers=num_workers, batch_size=batch_size)
+    _ = validate(model=model, device=device, loader=val_loader_pl)
+
+    print("Validation without PL bs 1")
+    batch_size = 1
+    val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size)
     _ = validate(model=model, device=device, loader=val_loader)
+    print("Validation with PL bs 1")
+    val_dataset_pl = torch.utils.data.ConcatDataset([val_dataset, pl_dataset])
+    val_loader_pl = DataLoader(dataset=val_dataset_pl, num_workers=num_workers, batch_size=batch_size)
+    _ = validate(model=model, device=device, loader=val_loader_pl)
 
     evaluate_all(model, batch_size=1, save_name=model_name)
