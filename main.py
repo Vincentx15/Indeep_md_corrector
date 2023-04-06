@@ -20,7 +20,7 @@ from learning_utils import RbfLoss, categorical_loss
 from predict import evaluate_all, validate
 
 
-def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_loader=None):
+def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_loader=None, grid_size=20., spacing=1.):
     time_init = time.time()
 
     for epoch in range(n_epochs):
@@ -49,7 +49,7 @@ def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_lo
 
         if not epoch % 50:
             # if epoch > 10 and not epoch % 50:
-            all_res = evaluate_all(model)
+            all_res = evaluate_all(model, grid_size=grid_size, spacing=spacing)
             mean_md_corr = np.mean([v for v in all_res.values()])
             writer.add_scalar('MD_validation', mean_md_corr, epoch)
 
@@ -89,18 +89,19 @@ if __name__ == '__main__':
     train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
                                   spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
     train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing,grid_size=grid_size, get_pl_instead=0.1)
+                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
     train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing,grid_size=grid_size, get_pl_instead=0.1)
+                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
     train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3])
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", rotate=False,
-                              spacing=spacing, grid_size=grid_size,get_pl_instead=0.)
+                              spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=num_workers, batch_size=batch_size)
     val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size)
 
     # Train
     train(model=model, device=device, loss_fn=loss_fn, loader=train_loader,
-          optimizer=optimizer, writer=writer, n_epochs=n_epochs, val_loader=val_loader)
+          optimizer=optimizer, writer=writer, n_epochs=n_epochs, val_loader=val_loader, grid_size=grid_size,
+          spacing=spacing)
     model.cpu()
     torch.save(model.state_dict(), model_path)
 
@@ -130,4 +131,4 @@ if __name__ == '__main__':
     val_loader_pl = DataLoader(dataset=val_dataset_pl, num_workers=num_workers, batch_size=batch_size)
     _ = validate(model=model, device=device, loader=val_loader_pl)
 
-    evaluate_all(model, batch_size=1, save_name=model_name)
+    evaluate_all(model, save_name=model_name, grid_size=grid_size, spacing=spacing)

@@ -147,7 +147,7 @@ class MDDataset(Dataset):
                  trajfilename,
                  selection=None,
                  spacing=1.,
-                 size=20,
+                 grid_size=20,
                  max_frames=None
                  ):
         cmd.feedback('disable', 'all', 'everything')
@@ -172,7 +172,7 @@ class MDDataset(Dataset):
         # print('Number of atoms in traj', cmd.select('traj'))
         nstates = cmd.count_states('traj')
         self.frames_to_use = nstates if max_frames is None else min(nstates, max_frames)
-        self.size = size
+        self.grid_size = grid_size
         self.spacing = spacing
 
     def __len__(self):
@@ -184,7 +184,8 @@ class MDDataset(Dataset):
                                            state=item + 1)
         # Use to define center and size, and then a complex
         center = tuple(coords.mean(axis=0)[:3])
-        grid = GridComputer(points=coords, center=center, rotate=False, grid_size=self.size, spacing=self.spacing).grid
+        grid = GridComputer(points=coords, center=center, rotate=False, grid_size=self.grid_size,
+                            spacing=self.spacing).grid
         return item, grid
 
 
@@ -194,9 +195,9 @@ def predict_traj(pdbfilename,
                  outfilename=None,
                  selection=None,
                  spacing=1.,
-                 size=20,
+                 grid_size=20,
                  max_frames=None,
-                 batch_size=30):
+                 batch_size=1):
     """
     Inference for validation on the small traj files.
     Assumption is clean PDB with just one chain.
@@ -212,7 +213,7 @@ def predict_traj(pdbfilename,
                               trajfilename=trajfilename,
                               selection=selection,
                               spacing=spacing,
-                              size=size,
+                              grid_size=grid_size,
                               max_frames=max_frames)
     # batch_size = 1
     # num_workers=0
@@ -242,7 +243,7 @@ def predict_traj(pdbfilename,
     return predictions
 
 
-def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=1):
+def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=1, grid_size=20, spacing=1.):
     pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
     trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
@@ -252,13 +253,18 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_
                                pdbfilename=pdbfilename,
                                trajfilename=trajfilename,
                                selection=sel,
-                               max_frames=max_frames, batch_size=batch_size)
+                               max_frames=max_frames,
+                               batch_size=batch_size,
+                               grid_size=grid_size,
+                               spacing=spacing
+                               )
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
     ground_truth = rmsd_gt_csv['RMSD'].values[:max_frames]
     return ground_truth, predictions
 
 
-def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1):
+def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1, grid_size=20,
+                 spacing=1.):
     if isinstance(model, str):
         model_path = os.path.join("saved_models", f'{model}.pth')
         model = RMSDModel()
@@ -267,7 +273,7 @@ def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=
     for system in sorted(os.listdir(parent_directory)):
         system_directory = os.path.join(parent_directory, system)
         ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames,
-                                                 batch_size=batch_size)
+                                                 batch_size=batch_size, grid_size=grid_size, spacing=spacing)
         correlation = scipy.stats.linregress(ground_truth, predictions)
         print(system, correlation)
         rvalue = correlation.rvalue
@@ -308,6 +314,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model_name = args.model_name
+    grid_size = 32
+    spacing = 0.65
 
     # build_pl_csv(csv_to_read="df_rmsd_train.csv")
     # build_pl_csv(csv_to_read="df_rmsd_validation.csv")
@@ -324,7 +332,7 @@ if __name__ == '__main__':
     # import time
     #
     # batch_size = 1
-    # all_res = evaluate_all(model_name, max_frames=None, save_name=model_name)
+    all_res = evaluate_all(model_name, max_frames=None, save_name=model_name, grid_size=grid_size, spacing=spacing)
     # Unbatched time : 298
     # Batched time : 175
-    plot_all(save_name=model_name)
+    # plot_all(save_name=model_name)

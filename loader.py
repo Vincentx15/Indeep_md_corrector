@@ -210,7 +210,6 @@ class GridComputer(object):
 
 
 class RMSDDataset(Dataset):
-
     def __init__(self,
                  data_root="data/low_rmsd",
                  csv_to_read="df_rmsd_train.csv",
