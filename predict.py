@@ -192,6 +192,7 @@ class MDDataset(Dataset):
 def predict_traj(pdbfilename,
                  trajfilename,
                  model,
+                 device,
                  outfilename=None,
                  selection=None,
                  spacing=1.,
@@ -203,9 +204,6 @@ def predict_traj(pdbfilename,
     Assumption is clean PDB with just one chain.
     Give me the MD PDB, traj and selection for this system and I give you a prediction.
     """
-
-    gpu_number = 0
-    device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
 
     if outfilename is None:
         outfilename = f'rmsd.txt'
@@ -243,7 +241,8 @@ def predict_traj(pdbfilename,
     return predictions
 
 
-def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=1, grid_size=20, spacing=1.):
+def evaluate_one(model, device, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_size=1, grid_size=20,
+                 spacing=1.):
     pdbfilename = os.path.join(directory, "step1_pdbreader_HIS.pdb")
     trajfilename = os.path.join(directory, "traj_comp_pbc.xtc")
     selection_filename = os.path.join(directory, "resis_ASA_thr_20.0.txt")
@@ -256,14 +255,16 @@ def evaluate_one(model, directory="data/md/XIAP1nw9HD/", max_frames=None, batch_
                                max_frames=max_frames,
                                batch_size=batch_size,
                                grid_size=grid_size,
-                               spacing=spacing
+                               spacing=spacing,
+                               device=device
                                )
     rmsd_gt_csv = pd.read_csv(os.path.join(directory, "rmsd-min_traj_PLs.csv"))
     ground_truth = rmsd_gt_csv['RMSD'].values[:max_frames]
     return ground_truth, predictions
 
 
-def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1, grid_size=20,
+def evaluate_all(model, device, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1,
+                 grid_size=20,
                  spacing=1.):
     if isinstance(model, str):
         model_path = os.path.join("saved_models", f'{model}.pth')
@@ -272,8 +273,13 @@ def evaluate_all(model, parent_directory="data/md/", max_frames=None, save_name=
     all_res = dict()
     for system in sorted(os.listdir(parent_directory)):
         system_directory = os.path.join(parent_directory, system)
-        ground_truth, predictions = evaluate_one(model=model, directory=system_directory, max_frames=max_frames,
-                                                 batch_size=batch_size, grid_size=grid_size, spacing=spacing)
+        ground_truth, predictions = evaluate_one(model=model,
+                                                 device=device,
+                                                 directory=system_directory,
+                                                 max_frames=max_frames,
+                                                 batch_size=batch_size,
+                                                 grid_size=grid_size,
+                                                 spacing=spacing)
         correlation = scipy.stats.linregress(ground_truth, predictions)
         print(system, correlation)
         rvalue = correlation.rvalue

@@ -49,7 +49,7 @@ def train(model, device, optimizer, loss_fn, loader, writer, n_epochs=10, val_lo
 
         if not epoch % 50:
             # if epoch > 10 and not epoch % 50:
-            all_res = evaluate_all(model, grid_size=grid_size, spacing=spacing)
+            all_res = evaluate_all(model, device=device, grid_size=grid_size, spacing=spacing)
             mean_md_corr = np.mean([v for v in all_res.values()])
             writer.add_scalar('MD_validation', mean_md_corr, epoch)
 
