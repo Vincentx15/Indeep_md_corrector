@@ -40,11 +40,11 @@ class RMSDModel(nn.Module):
     Perform 3D conv, BN and elu activation to go from in_channels to out_channels
     """
 
-    def __init__(self, channels=(5, 128, 256, 512, 512)):
+    def __init__(self, channels=(5, 128, 256, 512)):
         super(RMSDModel, self).__init__()
         self.convs = nn.ModuleList()
         for i, (prev, next) in enumerate(zip(channels, channels[1:])):
-            self.convs.append(ConvBlock(prev, next, use_batch_norm=i < 3))
+            self.convs.append(ConvBlock(prev, next, use_batch_norm=i < 2))
             self.convs.append(nn.MaxPool3d(kernel_size=3, stride=2))
 
         # self.fc = nn.ModuleList()
@@ -55,7 +55,16 @@ class RMSDModel(nn.Module):
     def forward(self, x):
         # augment channels, reduce size
         for block in self.convs:
+            # print("block : ", block._get_name())
+            # print("preop : ", x.shape)
             x = block(x)
+            # print("postop : ", x.shape)
+            # try:
+            #     print("I used BN : ", block.use_batch_norm)
+            # except:
+            #     pass
+        # print("done")
+
         if not all([1 == i for i in x.shape[-3:]]):
             x = nn.AvgPool3d(kernel_size=x.shape[-3])(x)
 

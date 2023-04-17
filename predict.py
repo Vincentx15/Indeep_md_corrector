@@ -315,7 +315,7 @@ if __name__ == '__main__':
 
     model_name = args.model_name
     grid_size = 32
-    spacing = 0.65
+    spacing = 1.
 
     # build_pl_csv(csv_to_read="df_rmsd_train.csv")
     # build_pl_csv(csv_to_read="df_rmsd_validation.csv")

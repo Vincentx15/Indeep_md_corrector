@@ -66,6 +66,9 @@ if __name__ == '__main__':
     model_name = args.model_name
     data_root = "data/low_rmsd"
 
+    torch.manual_seed(0)
+    np.random.seed(0)
+
     # Setup learning
     os.makedirs("saved_models", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
@@ -81,7 +84,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters())
 
     # Setup data
-    spacing = 0.65
+    spacing = 1.
     grid_size = 32
     batch_size = 32
     num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
@@ -92,7 +95,10 @@ if __name__ == '__main__':
                                   spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
     train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
                                   spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
-    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3])
+    train_dataset_4 = RMSDDataset(data_root="data/hd", csv_to_read="df_rmsd_HD_train.csv",
+                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
+    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3, train_dataset_4])
+
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", rotate=False,
                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
     train_loader = DataLoader(dataset=train_dataset, shuffle=True, num_workers=num_workers, batch_size=batch_size)
