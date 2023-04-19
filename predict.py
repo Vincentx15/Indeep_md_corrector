@@ -230,7 +230,9 @@ def predict_traj(pdbfilename,
             # Then from this object find the right box based on the box selection
             items = list(items.cpu().numpy())
             scores = predict_frame(grid=grids, model=model, device=device)
-            if batch_size == 1:
+
+            # This results from the .squeeze call that turns batches of 1 into single numbers
+            if len(scores.shape) == 0:
                 scores = scores.reshape((1,))
             predictions.append(scores)
             for item, score in zip(items, scores):
@@ -297,6 +299,7 @@ def evaluate_all(model, device, parent_directory="data/md/", max_frames=None, sa
 
 def plot_all(save_name='first_model'):
     fig, ax = plt.subplots(3, 3)
+    fig2, global_ax = plt.subplots(1, 1)
     dumps_dir = os.path.join('dumps', save_name)
     for i, system in enumerate(os.listdir(dumps_dir)):
         system_dump = os.path.join(dumps_dir, system)
@@ -305,7 +308,13 @@ def plot_all(save_name='first_model'):
         predictions = archive['predictions']
 
         current_ax = ax[i % 3, i // 3]
+        # current_ax.set_xlim(0.5, 3)
+        # current_ax.set_ylim(0.5, 3)
+
+        global_ax.set_xlim(0.5, 3)
+        global_ax.set_ylim(0.5, 3)
         current_ax.scatter(ground_truth, predictions, alpha=0.03)
+        global_ax.scatter(ground_truth, predictions, alpha=0.04)
         current_ax.set_title(system.split('.npz')[0])
     fig.supxlabel('RMSD')
     fig.supylabel('Prediction')
@@ -317,6 +326,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='')
     parser.add_argument("-m", "--model_name")
+    parser.add_argument("--save_name", default=None)
+    parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
 
     model_name = args.model_name
@@ -337,8 +348,11 @@ if __name__ == '__main__':
 
     # import time
     #
-    # batch_size = 1
-    all_res = evaluate_all(model_name, max_frames=None, save_name=model_name, grid_size=grid_size, spacing=spacing)
+    batch_size = 1
+    device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
+    save_name = model_name if args.save_name is None else args.save_name
+    # all_res = evaluate_all(model_name, device=device,max_frames=None,save_name=save_name,batch_size=batch_size,
+    #                        grid_size=grid_size,spacing=spacing)
     # Unbatched time : 298
     # Batched time : 175
-    # plot_all(save_name=model_name)
+    plot_all(save_name=model_name)

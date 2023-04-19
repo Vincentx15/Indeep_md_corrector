@@ -63,19 +63,17 @@ if __name__ == '__main__':
     parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
 
-    model_name = args.model_name
-    data_root = "data/low_rmsd"
-
     torch.manual_seed(0)
     np.random.seed(0)
+
+    model_name = args.model_name
 
     # Setup learning
     os.makedirs("saved_models", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
     writer = SummaryWriter(log_dir=f"logs/{model_name}")
     model_path = os.path.join("saved_models", f'{model_name}.pth')
-    gpu_number = args.gpu
-    device = f'cuda:{gpu_number}' if torch.cuda.is_available() else 'cpu'
+    device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
 
     # Learning hyperparameters
     n_epochs = 500
@@ -88,16 +86,21 @@ if __name__ == '__main__':
     grid_size = 32
     batch_size = 32
     num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
+    data_root = "data/fused"
 
-    train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
-    train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
-    train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
-                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
-    train_dataset_4 = RMSDDataset(data_root="data/hd", csv_to_read="df_rmsd_HD_train.csv",
-                                  spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
-    train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3, train_dataset_4])
+    train_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
+                                spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
+
+    # data_root = "data/low_rmsd"
+    # train_dataset_1 = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_train.csv",
+    #                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
+    # train_dataset_2 = RMSDDataset(data_root="data/high_rmsd", csv_to_read="df_rmsd_train.csv",
+    #                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
+    # train_dataset_3 = RMSDDataset(data_root="data/double_rmsd", csv_to_read="df_rmsd_train.csv",
+    #                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.1)
+    # train_dataset_4 = RMSDDataset(data_root="data/hd", csv_to_read="df_rmsd_HD_train.csv",
+    #                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
+    # train_dataset = torch.utils.data.ConcatDataset([train_dataset_1, train_dataset_2, train_dataset_3, train_dataset_4])
 
     val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", rotate=False,
                               spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
