@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(description='')
 parser.add_argument("-m", "--model_name", default='mixed_4')
 parser.add_argument("--save_name", default=None)
 parser.add_argument("--gpu", type=int, default=0)
+parser.add_argument("--nw", type=int, default=None)
 args = parser.parse_args()
 
 torch.manual_seed(0)
@@ -44,12 +45,13 @@ else:
 
 # DATA
 data_root = "data/fused"
+mode = 'validation'
 spacing = 1.
 grid_size = 32
-num_workers = 0
-# num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
+# num_workers = 0
+num_workers = max(os.cpu_count() - 10, 4) if args.nw is None else args.nw
 
-val_dataset = RMSDDataset(data_root=data_root, csv_to_read="df_rmsd_validation.csv", rotate=False,
+val_dataset = RMSDDataset(data_root=data_root, csv_to_read=f"df_rmsd_{mode}.csv", rotate=False,
                           spacing=spacing, grid_size=grid_size, get_pl_instead=0.)
 val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size, shuffle=False)
 ground_truth, prediction, correlation, rmse = validate(model, device=device, loader=val_loader, return_pred=True)
@@ -57,9 +59,7 @@ ground_truth, prediction, correlation, rmse = validate(model, device=device, loa
 print('Total correlation : ', correlation)
 
 # print(correlation)
-new_path = 'data/fused'
-mode = 'validation'
-csv_path = os.path.join(new_path, 'data', f'df_rmsd_{mode}.csv')
+csv_path = os.path.join(data_root, 'data', f'df_rmsd_{mode}.csv')
 plot = False
 grouped = get_grouped(csv_path=csv_path)
 grouped_result = dict()
