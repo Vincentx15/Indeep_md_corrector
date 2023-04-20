@@ -22,6 +22,7 @@ import time
 
 def predict(model, device, loader):
     predictions, ground_truth = [], []
+    model = model.to(device)
     with torch.no_grad():
         for step, (names, grids, rmsds) in enumerate(loader):
             grids = grids.to(device)

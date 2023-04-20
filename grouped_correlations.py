@@ -81,7 +81,8 @@ for uniprot, keys in grouped.items():
         group_pred = group_pred / np.max(group_pred)
         global_ax.scatter(group_gt, group_pred, alpha=0.4)
 
-print(f"Total system split correlation : ", np.mean(grouped_result.values()))
+correlations = np.asarray(list(grouped_result.values()), dtype=float)
+print(f"Total system split correlation : ", np.mean(correlations))
 
 if plot:
     plt.show()
