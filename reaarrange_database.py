@@ -7,6 +7,7 @@ import pandas as pd
 
 def merge(old_path, new_path, prefix):
     for mode in ['train', 'validation', 'test']:
+        print(f"Doing {prefix} in mode : {mode}")
         # All old dataframes have a specificity, the names or columns are a bit different
         if prefix == 'hd':
             old_csv_path = os.path.join(old_path, 'data', f'df_rmsd_HD_{mode}.csv')
@@ -52,15 +53,18 @@ def merge(old_path, new_path, prefix):
             new_dir_mmtf = os.path.join(new_path, os.path.dirname(new_path_pdb_ros))
             new_path_mmtf = os.path.join(new_path, new_path_pdb_ros)
             os.makedirs(new_dir_mmtf, exist_ok=True)
-            shutil.copy(old_path_mmtf, new_path_mmtf)
+            if not os.path.exists(new_path_mmtf):
+                shutil.copy(old_path_mmtf, new_path_mmtf)
             if not i % 1000:
                 print(i)
         df_new = df_new.drop_duplicates()
         df_new.to_csv(new_csv_path)
 
 
-merge('data/low_rmsd', 'data/fused', prefix='low_rmsd')
-merge('data/high_rmsd', 'data/fused', prefix='high_rmsd')
-merge('data/double_rmsd', 'data/fused', prefix='double_rmsd')
-merge('data/low_rmsd', 'data/fused', prefix='pl')
-merge('data/hd', 'data/fused', prefix='hd')
+# merge('data/low_rmsd', 'data/fused', prefix='low_rmsd')
+# merge('data/high_rmsd', 'data/fused', prefix='high_rmsd')
+# merge('data/double_rmsd', 'data/fused', prefix='double_rmsd')
+# merge('data/low_rmsd', 'data/fused', prefix='pl')
+# merge('data/hd', 'data/fused', prefix='hd')
+
+

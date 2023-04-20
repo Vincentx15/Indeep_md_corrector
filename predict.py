@@ -58,7 +58,7 @@ def build_pl_csv(data_root="data/low_rmsd",
     new_df.to_csv(csv_to_dump)
 
 
-def validate(model, device, loader, writer=None, epoch=0):
+def validate(model, device, loader, writer=None, epoch=0, return_pred=False):
     ground_truth, prediction = predict(model=model, device=device, loader=loader)
     correlation = scipy.stats.linregress(ground_truth, prediction).rvalue
     rmse = np.mean(np.sqrt((ground_truth - prediction) ** 2))
@@ -66,6 +66,8 @@ def validate(model, device, loader, writer=None, epoch=0):
     if writer is not None:
         writer.add_scalar('rmse_val', rmse, epoch)
         writer.add_scalar('corr_val', correlation, epoch)
+    if return_pred:
+        return ground_truth, prediction, correlation, rmse
     return correlation, rmse
 
 
