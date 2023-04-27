@@ -12,7 +12,7 @@ import pandas as pd
 from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 
-from loader import GridComputer, selection_to_split_coords
+from loader import GridComputer, selection_to_split_coords, get_split_coords
 from model import RMSDModel
 import utils
 import time
@@ -127,17 +127,7 @@ def predict_pdb(pdbfilename,
         print("loaded model")
 
     cmd.feedback('disable', 'all', 'everything')
-    # chain = 'polymer.protein'
-    if selection is None:
-        box = f'polymer.protein'
-    else:
-        box = f'polymer.protein and {selection}'
-
-    # Align the trajectory on the selected atoms on the first frame
-    cmd.load(pdbfilename, 'prot')
-    cmd.remove('hydrogens')
-    # print('Number of atoms in prot', cmd.select('prot'))
-    coords = selection_to_split_coords(selection=f'prot and {box}')
+    coords = get_split_coords(pdbfilename_p=pdbfilename, selection=selection)
     # Use to define center and size, and then a complex
     center = tuple(coords.mean(axis=0)[:3])
     grid = GridComputer(points=coords, center=center, grid_size=size, spacing=spacing).grid
@@ -346,13 +336,27 @@ if __name__ == '__main__':
     # build_pl_csv(csv_to_read="df_rmsd_validation.csv")
     # build_pl_csv(csv_to_read="df_rmsd_test.csv")
 
+    # path_pdb = "data/double_rmsd/data/Pockets/PL_train/A8DG50/3m5l-A-A8DG50/3m5l-A-A8DG50_0001_last.mmtf"
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_train/A8DG50/3m5l-A-A8DG50/3m5l-A-A8DG50_0001_last.mmtf"
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_train/A8DG50/3m5l-A-A8DG50/3m5l-A-A8DG50.pdb"
+    # path_sel = "data/low_rmsd/Resis/A8DG50_resis_ASA_thr_20.txt"
+
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_test/O15151/2n0u-A-O15151/2n0u-A-O15151_0001_last.mmtf"
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_test/O15151/2n0u-A-O15151/2n0u-A-O15151.pdb"
+    # path_sel = "data/low_rmsd/Resis/O15151_resis_ASA_thr_20.txt"
+
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
     # path_pdb = "data/double_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
-    path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254.pdb"
-    path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254.pdb"
+    # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
+
+    path_pdb = "data/double_rmsd/data/Pockets/PL_test/O15151/2n0u-A-O15151/2n0u-A-O15151_0001_last.mmtf"
+    # path_pdb = "data/low_rmsd/data/Pockets/PL_test/O15151/2n0u-A-O15151/2n0u-A-O15151_0001_last.mmtf"
+    path_pdb = "data/low_rmsd/data/Pockets/PL_test/O15151/2n0u-A-O15151/2n0u-A-O15151.pdb"
+    path_sel = "data/low_rmsd/Resis/O15151_resis_ASA_thr_20.txt"
     with open(path_sel, 'r') as f:
         sel = f.readline()
-    predict_pdb(model=model_name, pdbfilename=path_pdb, selection=sel)
+    predict_pdb(model=model_name, pdbfilename=path_pdb, selection=sel, size=grid_size, spacing=spacing)
 
     # gt, pred = evaluate_one(model, max_frames=50)
 

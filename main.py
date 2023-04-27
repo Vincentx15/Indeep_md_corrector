@@ -16,7 +16,6 @@ pymol2.SingletonPyMOL().start()
 
 from loader import RMSDDataset
 from model import RMSDModel
-from learning_utils import RbfLoss, categorical_loss
 from predict import evaluate_all, validate
 
 
@@ -58,7 +57,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-m", "--model_name", default='long_train')
+    parser.add_argument("-m", "--model_name", default='mixed_4')
     parser.add_argument("--nw", type=int, default=None)
     parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
