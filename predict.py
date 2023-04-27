@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from pymol import cmd
-import psico.fullinit
-import psico.helping
 import scipy.ndimage
 import scipy.spatial.distance
 import pandas as pd
@@ -121,6 +119,12 @@ def predict_pdb(pdbfilename,
     Assumption is clean PDB with just one chain.
     Give me the MD PDB, traj and selection for this system and I give you a prediction.
     """
+    if isinstance(model, str):
+        model_path = os.path.join("saved_models", f'{model}.pth')
+        model = RMSDModel()
+        model.load_state_dict(torch.load(model_path))
+        model.eval()
+        print("loaded model")
 
     cmd.feedback('disable', 'all', 'everything')
     # chain = 'polymer.protein'
@@ -132,8 +136,7 @@ def predict_pdb(pdbfilename,
     # Align the trajectory on the selected atoms on the first frame
     cmd.load(pdbfilename, 'prot')
     cmd.remove('hydrogens')
-    print(cmd.get_object_list())
-    print('Number of atoms in prot', cmd.select('prot'))
+    # print('Number of atoms in prot', cmd.select('prot'))
     coords = selection_to_split_coords(selection=f'prot and {box}')
     # Use to define center and size, and then a complex
     center = tuple(coords.mean(axis=0)[:3])
@@ -154,7 +157,6 @@ class MDDataset(Dataset):
                  max_frames=None
                  ):
         cmd.feedback('disable', 'all', 'everything')
-        # chain = 'polymer.protein'
         if selection is None:
             self.box = f'polymer.protein'
         else:
@@ -328,34 +330,37 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-m", "--model_name")
+    parser.add_argument("-m", "--model_name", default='mixed_4')
     parser.add_argument("--save_name", default=None)
     parser.add_argument("--gpu", type=int, default=0)
     args = parser.parse_args()
 
     model_name = args.model_name
+    save_name = model_name if args.save_name is None else args.save_name
+    device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
     grid_size = 32
     spacing = 1.
+    batch_size = 1
 
     # build_pl_csv(csv_to_read="df_rmsd_train.csv")
     # build_pl_csv(csv_to_read="df_rmsd_validation.csv")
     # build_pl_csv(csv_to_read="df_rmsd_test.csv")
 
     # path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
-    # path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
-    # with open(path_sel, 'r') as f:
-    #     sel = f.readline()
-    # predict_pdb(model=model, pdbfilename=path_pdb, selection=sel)
+    # path_pdb = "data/double_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254_0001_last.mmtf"
+    path_pdb = "data/low_rmsd/data/Pockets/PL_test/P08254/1b8y-A-P08254/1b8y-A-P08254.pdb"
+    path_sel = "data/low_rmsd/Resis/P08254_resis_ASA_thr_20.txt"
+    with open(path_sel, 'r') as f:
+        sel = f.readline()
+    predict_pdb(model=model_name, pdbfilename=path_pdb, selection=sel)
 
     # gt, pred = evaluate_one(model, max_frames=50)
 
     # import time
     #
-    batch_size = 1
-    device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
-    save_name = model_name if args.save_name is None else args.save_name
+
     # all_res = evaluate_all(model_name, device=device,max_frames=None,save_name=save_name,batch_size=batch_size,
     #                        grid_size=grid_size,spacing=spacing)
     # Unbatched time : 298
     # Batched time : 175
-    plot_all(save_name=model_name)
+    # plot_all(save_name=model_name)

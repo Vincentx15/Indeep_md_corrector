@@ -118,7 +118,14 @@ if __name__ == '__main__':
     model = RMSDModel()
     model.load_state_dict(torch.load(model_path))
     model.to(device)
+    # model.eval()
     print("Validation without PL")
+    val_dataset = RMSDDataset(data_root="data/low_rmsd",
+                              csv_to_read="df_rmsd_validation.csv",
+                              spacing=spacing,
+                              grid_size=grid_size,
+                              rotate=False,
+                              get_pl_instead=0)
     _ = validate(model=model, device=device, loader=val_loader)
     print("Validation with PL")
     pl_dataset = RMSDDataset(data_root="data/low_rmsd",
@@ -136,8 +143,7 @@ if __name__ == '__main__':
     val_loader = DataLoader(dataset=val_dataset, num_workers=num_workers, batch_size=batch_size)
     _ = validate(model=model, device=device, loader=val_loader)
     print("Validation with PL bs 1")
-    val_dataset_pl = torch.utils.data.ConcatDataset([val_dataset, pl_dataset])
     val_loader_pl = DataLoader(dataset=val_dataset_pl, num_workers=num_workers, batch_size=batch_size)
     _ = validate(model=model, device=device, loader=val_loader_pl)
 
-    evaluate_all(model, save_name=model_name, grid_size=grid_size, spacing=spacing)
+    evaluate_all(model, save_name=model_name, grid_size=grid_size, spacing=spacing, device=device)
