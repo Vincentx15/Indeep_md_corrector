@@ -33,30 +33,6 @@ def predict(model, device, loader):
     return ground_truth, predictions
 
 
-def build_pl_csv(data_root="data/low_rmsd",
-                 csv_to_read="df_rmsd_train.csv"):
-    """
-    Build a csv in a similar format that the one for rosetta's files, for the PL files
-    One needs to do it in a non-redundant way
-    """
-    csv_file = os.path.join(data_root, "data/", csv_to_read)
-    csv_to_dump = os.path.join(data_root, "data/", csv_to_read.replace('rmsd', 'pl'))
-
-    df = pd.read_csv(csv_file)[['Path_PDB_Ros', 'Path_resis', 'RMSD']]
-    existing_rows = set()
-    new_df = pd.DataFrame(columns=df.columns)
-    for i, row in df.iterrows():
-        path_pdb, path_resi, rmsd = row.values
-        pl_dir, decoy_file = os.path.split(path_pdb)
-        pl_file = decoy_file.split('_')[0] + '.pdb'
-        if not pl_file in existing_rows:
-            existing_rows.add(pl_file)
-            pdb_filename = os.path.join(pl_dir, pl_file)
-            row = pdb_filename, path_resi, 0
-            new_df.loc[len(new_df)] = row
-    new_df.to_csv(csv_to_dump)
-
-
 def validate(model, device, loader, writer=None, epoch=0, return_pred=False):
     ground_truth, prediction = predict(model=model, device=device, loader=loader)
     correlation = scipy.stats.linregress(ground_truth, prediction).rvalue
@@ -119,13 +95,6 @@ def predict_pdb(pdbfilename,
     Assumption is clean PDB with just one chain.
     Give me the MD PDB, traj and selection for this system and I give you a prediction.
     """
-    if isinstance(model, str):
-        model_path = os.path.join("saved_models", f'{model}.pth')
-        model = RMSDModel()
-        model.load_state_dict(torch.load(model_path))
-        model.eval()
-        print("loaded model")
-
     cmd.feedback('disable', 'all', 'everything')
     coords = get_split_coords(pdbfilename_p=pdbfilename, selection=selection)
     # Use to define center and size, and then a complex
@@ -263,10 +232,6 @@ def evaluate_one(model, device, directory="data/md/XIAP1nw9HD/", max_frames=None
 def evaluate_all(model, device, parent_directory="data/md/", max_frames=None, save_name=None, batch_size=1,
                  grid_size=20,
                  spacing=1.):
-    if isinstance(model, str):
-        model_path = os.path.join("saved_models", f'{model}.pth')
-        model = RMSDModel()
-        model.load_state_dict(torch.load(model_path))
     all_res = dict()
     for system in sorted(os.listdir(parent_directory)):
         system_directory = os.path.join(parent_directory, system)
@@ -326,15 +291,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model_name = args.model_name
+    model_name = "rerun_mixed4_rotation"
     save_name = model_name if args.save_name is None else args.save_name
+    model = utils.model_from_name(model=model_name, eval=False)
     device = f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu'
     grid_size = 32
     spacing = 1.
     batch_size = 1
 
-    # build_pl_csv(csv_to_read="df_rmsd_train.csv")
-    # build_pl_csv(csv_to_read="df_rmsd_validation.csv")
-    # build_pl_csv(csv_to_read="df_rmsd_test.csv")
 
     # path_pdb = "data/double_rmsd/data/Pockets/PL_train/A8DG50/3m5l-A-A8DG50/3m5l-A-A8DG50_0001_last.mmtf"
     # path_pdb = "data/low_rmsd/data/Pockets/PL_train/A8DG50/3m5l-A-A8DG50/3m5l-A-A8DG50_0001_last.mmtf"
@@ -356,14 +320,14 @@ if __name__ == '__main__':
     path_sel = "data/low_rmsd/Resis/O15151_resis_ASA_thr_20.txt"
     with open(path_sel, 'r') as f:
         sel = f.readline()
-    predict_pdb(model=model_name, pdbfilename=path_pdb, selection=sel, size=grid_size, spacing=spacing)
+    predict_pdb(model=model, pdbfilename=path_pdb, selection=sel, size=grid_size, spacing=spacing)
 
     # gt, pred = evaluate_one(model, max_frames=50)
 
     # import time
     #
 
-    # all_res = evaluate_all(model_name, device=device,max_frames=None,save_name=save_name,batch_size=batch_size,
+    # all_res = evaluate_all(model, device=device,max_frames=None,save_name=save_name,batch_size=batch_size,
     #                        grid_size=grid_size,spacing=spacing)
     # Unbatched time : 298
     # Batched time : 175

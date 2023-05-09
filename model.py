@@ -54,7 +54,7 @@ class RMSDModel(nn.Module):
 
     def forward(self, x):
         # augment channels, reduce size
-        for block in self.convs:
+        for i, block in enumerate(self.convs):
             # print("block : ", block._get_name())
             # print("preop : ", x.shape)
             x = block(x)

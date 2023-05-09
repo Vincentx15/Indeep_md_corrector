@@ -187,7 +187,7 @@ class GridComputer(object):
         self.xyz_max = np.max(shifted_bins, axis=1)
         xi, yi, zi = shifted_bins
         one_hot = np.eye(len(utils.ATOMTYPES))[self.ids]
-        grid = get_grid(coords, xi, yi, zi, features=one_hot)
+        grid = get_grid(self.coords, xi, yi, zi, features=one_hot)
         self.grid = grid.astype(np.float32)
         # print("spatial_size", self.xyz_max - self.xyz_min)
         # print("grid_size", grid.shape)
